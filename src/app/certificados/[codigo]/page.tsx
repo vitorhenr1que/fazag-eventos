@@ -6,9 +6,10 @@ import { apiFetch } from '@/lib/api-client'
 import { useParams } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Download, Printer } from 'lucide-react'
+import { Download, Printer, Share2 } from 'lucide-react'
 import CertificateRenderer from '@/components/certificate/CertificateRenderer'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 
 export default function CertificadoPage() {
     const params = useParams()
@@ -35,6 +36,31 @@ export default function CertificadoPage() {
         load()
     }, [params.codigo])
 
+    const handleShare = async () => {
+        if (!certificado) return;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `Certificado - ${certificado.evento}`,
+                    text: `Veja meu certificado de participação no evento ${certificado.evento}`,
+                    url: window.location.href,
+                });
+            } catch (error) {
+                if ((error as Error).name !== 'AbortError') {
+                    console.error('Erro ao compartilhar:', error);
+                }
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                toast.success('Link do certificado copiado para a área de transferência!');
+            } catch (err) {
+                toast.error('Erro ao copiar link.');
+            }
+        }
+    };
+
     if (!loading && error) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-4">
             <div className="text-center">
@@ -45,7 +71,7 @@ export default function CertificadoPage() {
     )
 
     return (
-        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 pb-24 sm:pb-4">
             <style jsx global>{`
                 /* Esconde versão de impressão da tela, mas mantém renderizada para carregar imagens */
                 .only-print { 
@@ -96,10 +122,31 @@ export default function CertificadoPage() {
                 }
             `}</style>
 
-            <div className="w-full max-w-5xl mb-6 flex justify-between items-center no-print">
+            <div className="w-full max-w-5xl mb-6 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
                 <h1 className="text-xl font-bold text-slate-700">Visualização do Certificado</h1>
-                <Button onClick={() => setTimeout(() => window.print(), 100)} variant="outline" className="gap-2">
-                    <Printer size={16} /> Imprimir / Salvar PDF
+                <div className="hidden sm:flex items-center gap-2">
+                    <Button onClick={handleShare} variant="outline" className="gap-2">
+                        <Share2 size={16} /> Compartilhar
+                    </Button>
+                    <Button onClick={() => setTimeout(() => window.print(), 100)} className="gap-2 bg-blue-600 hover:bg-blue-700">
+                        <Download size={16} /> Salvar PDF
+                    </Button>
+                </div>
+            </div>
+
+            {/* Mobile Fixed Actions */}
+            <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-3 px-4 z-50 sm:hidden no-print">
+                <Button
+                    onClick={handleShare}
+                    className="flex-1 rounded-full shadow-2xl gap-2 h-14 bg-white text-slate-800 border-slate-200 hover:bg-slate-50 border font-bold"
+                >
+                    <Share2 size={20} /> Compartilhar
+                </Button>
+                <Button
+                    onClick={() => setTimeout(() => window.print(), 100)}
+                    className="flex-1 rounded-full shadow-2xl gap-2 h-14 bg-blue-600 hover:bg-blue-700 font-bold"
+                >
+                    <Download size={20} /> Salvar PDF
                 </Button>
             </div>
 
