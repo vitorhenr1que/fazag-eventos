@@ -30,7 +30,7 @@ export default function NovoEventoPage() {
         preco: 0,
         bannerUrl: '',
         certificado: {
-            fundoUrl: '',
+            fundoUrl: undefined,
             template: null, // O editor usará o default se for null
             ativo: true
         } as any

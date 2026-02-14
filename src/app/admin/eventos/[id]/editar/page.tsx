@@ -31,7 +31,7 @@ export default function EditarEventoPage() {
                     dataInicio: formatForInput(ev.dataInicio),
                     dataFim: formatForInput(ev.dataFim),
                     certificado: ev.certificado || {
-                        fundoUrl: '',
+                        fundoUrl: undefined,
                         template: null,
                         ativo: true
                     }

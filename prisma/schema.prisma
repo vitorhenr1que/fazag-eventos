@@ -136,7 +136,7 @@ model Certificado {
   // Relação com Evento (Configuração/Template)
   eventoId String? @unique @db.VarChar(25)
   evento   Evento? @relation("EventoCertificado", fields: [eventoId], references: [id])
-  fundoUrl String? @db.VarChar(255)
+  fundoUrl String? @default("https://cdn.fazag.edu.br/eventos/cmlln0h1700027zlb12hzfbux/certificado-fundo-1771082125912.png") @db.VarChar(255)
   template Json?
   ativo    Boolean @default(true)
 

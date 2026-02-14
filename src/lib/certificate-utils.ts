@@ -34,7 +34,10 @@ export interface CertificateTemplate {
 
 export const DEFAULT_TEMPLATE: CertificateTemplate = {
     page: { width: 1200, height: 850, unit: 'px' },
-    background: { url: '', fit: 'cover' },
+    background: {
+        url: 'https://cdn.fazag.edu.br/eventos/cmlln0h1700027zlb12hzfbux/certificado-fundo-1771082125912.png',
+        fit: 'cover'
+    },
     elements: [
         {
             id: 'titulo',

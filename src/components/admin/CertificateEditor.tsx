@@ -75,7 +75,10 @@ export default function CertificateEditor({
         }
         return {
             ...DEFAULT_TEMPLATE,
-            background: { ...DEFAULT_TEMPLATE.background, url: config.fundoUrl || '' }
+            background: {
+                ...DEFAULT_TEMPLATE.background,
+                url: config.fundoUrl ?? DEFAULT_TEMPLATE.background.url
+            }
         }
     })
 
@@ -101,7 +104,7 @@ export default function CertificateEditor({
                     ...loadedTemplate,
                     background: {
                         ...loadedTemplate.background,
-                        url: config.fundoUrl || loadedTemplate.background?.url || ''
+                        url: config.fundoUrl ?? loadedTemplate.background?.url ?? DEFAULT_TEMPLATE.background.url
                     }
                 } as CertificateTemplate
             })
