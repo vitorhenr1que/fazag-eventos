@@ -18,7 +18,7 @@ export class JobService {
         const nowUtc = fromZonedTime(nowInBr, timeZone)
 
         // No Prisma, ao passar um objeto Date, ele é tratado como UTC.
-        // O MySQL + Prisma armazena DateTime em UTC, então a comparação é direta.
+        // O MySQL + Prisma armazena DateTime em UTC, então a comparação é direta
         const result = await prisma.evento.updateMany({
             where: {
                 status: 'PUBLISHED',
