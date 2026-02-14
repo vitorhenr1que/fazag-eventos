@@ -49,12 +49,39 @@ export default function MinhasInscricoesPage() {
         }
     }
 
+    const totalHoras = inscricoes.reduce((acc, insc) => acc + (insc.certificado?.cargaHorariaTotal || 0), 0);
+    const totalCertificados = inscricoes.filter(insc => !!insc.certificado).length;
+
     return (
-        <div className="container py-8 max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold mb-8">Minhas Inscrições</h1>
+        <div className="container py-8 max-w-4xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <h1 className="text-3xl font-bold">Minhas Inscrições</h1>
+                {!loading && inscricoes.length > 0 && (
+                    <div className="flex gap-3 w-full md:w-auto">
+                        <div className="flex-1 md:flex-none bg-white p-3 px-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3">
+                            <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
+                                <Clock size={20} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] uppercase font-bold text-slate-400 leading-none mb-1">Total de Horas</p>
+                                <p className="text-xl font-black text-slate-700 leading-none">{Math.round(totalHoras)}h</p>
+                            </div>
+                        </div>
+                        <div className="flex-1 md:flex-none bg-white p-3 px-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3">
+                            <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600">
+                                <Award size={20} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] uppercase font-bold text-slate-400 leading-none mb-1">Certificados</p>
+                                <p className="text-xl font-black text-slate-700 leading-none">{totalCertificados}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {loading ? (
-                <div className="space-y-4">
+                <div className="grid gap-4">
                     {Array(3).fill(0).map((_, i) => (
                         <Card key={i}>
                             <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
@@ -75,9 +102,12 @@ export default function MinhasInscricoesPage() {
                     ))}
                 </div>
             ) : inscricoes.length === 0 ? (
-                <div className="text-center py-10 border rounded-lg bg-slate-50">
-                    <p className="text-muted-foreground mb-4">Você ainda não se inscreveu em nenhum evento.</p>
-                    <Button asChild><Link href="/eventos">Ver Eventos Disponíveis</Link></Button>
+                <div className="text-center py-16 border-2 border-dashed rounded-2xl bg-slate-50/50">
+                    <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Clock className="text-slate-400" size={32} />
+                    </div>
+                    <p className="text-slate-500 font-medium mb-6">Você ainda não se inscreveu em nenhum evento.</p>
+                    <Button asChild size="lg" className="font-bold shadow-lg"><Link href="/eventos">Explorar Eventos</Link></Button>
                 </div>
             ) : (
                 <div className="space-y-4">
