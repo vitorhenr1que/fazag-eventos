@@ -5,7 +5,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api-client'
 import { useParams } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
-
+import { Button } from '@/components/ui/button'
+import { Download, Printer } from 'lucide-react'
+import CertificateRenderer from '@/components/certificate/CertificateRenderer'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function CertificadoPage() {
@@ -43,81 +45,121 @@ export default function CertificadoPage() {
     )
 
     return (
-        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-            <Card className="max-w-3xl w-full border-4 border-double border-yellow-600 bg-[#fffdf5] shadow-2xl overflow-hidden relative">
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+            <style jsx global>{`
+                /* Esconde versão de impressão da tela, mas mantém renderizada para carregar imagens */
+                .only-print { 
+                    position: fixed;
+                    left: -9999px;
+                    top: 0;
+                    width: 1px;
+                    height: 1px;
+                    overflow: hidden;
+                    opacity: 0;
+                    pointer-events: none;
+                }
+                
+                @media print {
+                    @page {
+                        margin: 0;
+                        size: landscape;
+                    }
+                    body {
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
+                        background: white;
+                    }
+                    .no-print { display: none !important; }
+                    .only-print {
+                        opacity: 1;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        background: white;
+                        z-index: 9999;
+                        display: flex !important;
+                        align-items: center;
+                        justify-content: center;
+                        overflow: visible;
+                    }
+                    /* Força o conteúdo a caber na página A4 landscape */
+                    .print-content {
+                        width: 297mm;
+                        height: 210mm;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        overflow: hidden;
+                    }
+                }
+            `}</style>
+
+            <div className="w-full max-w-5xl mb-6 flex justify-between items-center no-print">
+                <h1 className="text-xl font-bold text-slate-700">Visualização do Certificado</h1>
+                <Button onClick={() => setTimeout(() => window.print(), 100)} variant="outline" className="gap-2">
+                    <Printer size={16} /> Imprimir / Salvar PDF
+                </Button>
+            </div>
+
+            <div className="w-full max-w-5xl bg-white shadow-2xl overflow-hidden no-print">
                 {loading ? (
-                    <CardContent className="p-12 text-center space-y-8">
-                        <div className="border-b-2 border-yellow-600 pb-4 mb-8">
-                            <Skeleton className="h-10 w-3/4 mx-auto" />
-                        </div>
-                        <div className="space-y-6 pt-4">
-                            <Skeleton className="h-4 w-24 mx-auto" />
-                            <Skeleton className="h-12 w-2/3 mx-auto" />
-                            <div className="space-y-2 py-6">
-                                <Skeleton className="h-4 w-full max-w-lg mx-auto" />
-                                <Skeleton className="h-4 w-full max-w-md mx-auto" />
-                            </div>
-                        </div>
-                        <div className="mt-12 flex justify-between items-end border-t pt-8">
-                            <div className="space-y-2">
-                                <Skeleton className="h-3 w-20" />
-                                <Skeleton className="h-6 w-32" />
-                            </div>
-                            <div className="space-y-2 flex flex-col items-end">
-                                <Skeleton className="h-3 w-24" />
-                                <Skeleton className="h-3 w-16" />
-                            </div>
-                        </div>
-                    </CardContent>
+                    <div className="p-12 space-y-8 text-center bg-white">
+                        <Skeleton className="h-12 w-3/4 mx-auto" />
+                        <Skeleton className="h-48 w-full mx-auto" />
+                        <Skeleton className="h-8 w-1/2 mx-auto" />
+                    </div>
                 ) : (
-                    <CardContent className="p-12 text-center space-y-8 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none text-9xl font-serif">
-                            Certificate
-                        </div>
-
-                        <div className="border-b-2 border-yellow-600 pb-4 mb-8">
-                            <h1 className="text-4xl font-serif font-bold text-gray-800 uppercase tracking-widest">
-                                Certificado de Participação
-                            </h1>
-                        </div>
-
-                        <div className="space-y-6">
-                            <p className="text-lg text-gray-600">Certificamos que</p>
-                            <h2 className="text-3xl font-bold text-gray-900 font-serif border-b inline-block pb-1 min-w-[300px]">
-                                {certificado.aluno}
-                            </h2>
-
-                            <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-                                Participou do evento <strong>{certificado.evento}</strong>,
-                                Realizado em {formatDate(certificado.metadadosEvento?.dataInicio || new Date(), 'dd/MM/yyyy')},
-                                com carga horária total de <strong>{certificado.cargaHoraria} horas</strong>.
-                            </p>
-
-                            {certificado.metadadosEvento?.subeventos?.length > 0 && (
-                                <div className="mt-6 text-sm text-gray-500">
-                                    <p className="font-semibold mb-2">Atividades Complementares:</p>
-                                    <ul className="list-disc list-inside inline-block text-left">
-                                        {certificado.metadadosEvento.subeventos.map((s: string, i: number) => (
-                                            <li key={i}>{s}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-12 flex justify-between items-end border-t pt-8 text-xs text-gray-400">
-                            <div className="text-left">
-                                <p>Código de Validação:</p>
-                                <p className="font-mono text-base text-gray-600 select-all">{certificado.codigo}</p>
-                            </div>
-                            <div className="text-right">
-                                <p>Emitido em: {formatDate(certificado.dataEmissao, 'dd/MM/yyyy')}</p>
-                                <p>FAZAG Eventos</p>
-                            </div>
-                        </div>
-                    </CardContent>
+                    <CertificateRenderer
+                        template={{
+                            ...certificado.template,
+                            background: {
+                                ...certificado.template?.background,
+                                url: certificado.fundoUrl || certificado.template?.background?.url || ''
+                            }
+                        }}
+                        data={{
+                            NOME_ALUNO: certificado.aluno,
+                            NOME_EVENTO: certificado.evento,
+                            CARGA_HORARIA: certificado.cargaHoraria?.toString(),
+                            DATA: formatDate(certificado.metadados?.dataInicio || new Date(), 'dd/MM/yyyy'),
+                            CODIGO_VALIDACAO: certificado.codigo
+                        }}
+                    />
                 )}
-            </Card>
+            </div>
+
+            {/* Versão Exclusiva para Impressão */}
+            {!loading && certificado && (
+                <div className="only-print">
+                    <div className="print-content">
+                        <CertificateRenderer
+                            template={{
+                                ...certificado.template,
+                                background: {
+                                    ...certificado.template?.background,
+                                    url: certificado.fundoUrl || certificado.template?.background?.url || ''
+                                }
+                            }}
+                            width={1122} // A4 width @ 96dpi
+                            data={{
+                                NOME_ALUNO: certificado.aluno,
+                                NOME_EVENTO: certificado.evento,
+                                CARGA_HORARIA: certificado.cargaHoraria?.toString(),
+                                DATA: formatDate(certificado.metadados?.dataInicio || new Date(), 'dd/MM/yyyy'),
+                                CODIGO_VALIDACAO: certificado.codigo
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {!loading && !error && (
+                <div className="mt-8 text-center text-sm text-slate-500 no-print">
+                    <p>Documento assinado digitalmente. A validade deste documento pode ser verificada através do código: <strong>{certificado.codigo}</strong></p>
+                </div>
+            )}
         </div>
     )
 }
