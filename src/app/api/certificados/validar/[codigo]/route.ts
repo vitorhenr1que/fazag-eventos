@@ -24,7 +24,7 @@ export async function GET(
             }
         })
 
-        if (!certificado) {
+        if (!certificado || !certificado.inscricao) {
             return NextResponse.json({ success: false, error: 'Certificado inválido ou não encontrado' }, { status: 404 })
         }
 
