@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Aluno {
+  id         String      @id @db.VarChar(36)
+  nome       String      @db.VarChar(120)
+  email      String?     @db.VarChar(190)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  inscricoes Inscricao[]
+
+  @@map("alunos")
+}
+
+model Admin {
+  id        String   @id @default(cuid()) @db.VarChar(25)
+  email     String   @unique @db.VarChar(190)
+  senha     String   @db.VarChar(255)
+  nome      String   @db.VarChar(120)
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model Evento {
+  id                       String        @id @default(cuid()) @db.VarChar(25)
+  slug                     String        @unique @db.VarChar(120)
+  nome                     String        @db.VarChar(160)
+  descricao                String?       @db.Text
+  local                    String?       @db.VarChar(160)
+  bannerUrl                String?       @db.VarChar(255)
+  status                   EventoStatus  @default(DRAFT)
+  tipo                     TipoPagamento @default(GRATUITO)
+  dataInicio               DateTime
+  dataFim                  DateTime
+  totalVagas               Int
+  temSubeventos            Boolean       @default(false)
+  cargaHorariaBase         Float?
+  limiteSubeventosPorAluno Int?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  preco                    Decimal?      @db.Decimal(10, 2)
+
+  subeventos Subevento[]
+  inscricoes Inscricao[]
+
+  @@index([status])
+  @@index([dataInicio])
+  @@map("eventos")
+}
+
+model Subevento {
+  id           String   @id @default(cuid()) @db.VarChar(25)
+  eventoId     String   @db.VarChar(25)
+  nome         String   @db.VarChar(160)
+  descricao    String?  @db.Text
+  local        String?  @db.VarChar(160)
+  dataInicio   DateTime
+  dataFim      DateTime
+  totalVagas   Int
+  cargaHoraria Float
+
+  evento              Evento               @relation(fields: [eventoId], references: [id])
+  inscricoesSubevento InscricaoSubevento[]
+
+  @@index([eventoId])
+  @@map("subeventos")
+}
+
+model Inscricao {
+  id            String   @id @default(cuid()) @db.VarChar(25)
+  eventoId      String   @db.VarChar(25)
+  alunoId       String   @db.VarChar(36)
+  dataInscricao DateTime @default(now())
+  status        String   @default("CONFIRMADA") @db.VarChar(20)
+
+  evento               Evento               @relation(fields: [eventoId], references: [id])
+  aluno                Aluno                @relation(fields: [alunoId], references: [id])
+  subeventosEscolhidos InscricaoSubevento[]
+  checkIn              CheckIn?
+  certificado          Certificado?
+
+  @@unique([eventoId, alunoId])
+  @@index([alunoId])
+  @@map("inscricoes")
+}
+
+model InscricaoSubevento {
+  id            String   @id @default(cuid()) @db.VarChar(25)
+  inscricaoId   String   @db.VarChar(25)
+  subeventoId   String   @db.VarChar(25)
+  dataInscricao DateTime @default(now())
+
+  inscricao Inscricao @relation(fields: [inscricaoId], references: [id])
+  subevento Subevento @relation(fields: [subeventoId], references: [id])
+  checkIn   CheckIn?
+
+  @@unique([inscricaoId, subeventoId])
+  @@index([subeventoId])
+  @@map("inscricoes_subeventos")
+}
+
+model CheckIn {
+  id                   String              @id @default(cuid()) @db.VarChar(25)
+  dataHora             DateTime            @default(now())
+  inscricaoId          String?             @unique @db.VarChar(25)
+  inscricaoSubeventoId String?             @unique @db.VarChar(25)
+  inscricao            Inscricao?          @relation(fields: [inscricaoId], references: [id])
+  inscricaoSubevento   InscricaoSubevento? @relation(fields: [inscricaoSubeventoId], references: [id])
+
+  @@index([dataHora])
+  @@map("checkins")
+}
+
+model Certificado {
+  id                String   @id @default(cuid()) @db.VarChar(25)
+  inscricaoId       String   @unique @db.VarChar(25)
+  codigoValidacao   String   @unique @db.VarChar(64)
+  urlPublica        String?  @db.VarChar(255)
+  cargaHorariaTotal Float
+  dataEmissao       DateTime @default(now())
+  metadadosEvento   Json
+
+  inscricao Inscricao @relation(fields: [inscricaoId], references: [id])
+
+  @@index([codigoValidacao])
+  @@map("certificados")
+}
+
+enum EventoStatus {
+  DRAFT
+  PUBLISHED
+  FINISHED
+  CANCELLED
+}
+
+enum TipoPagamento {
+  GRATUITO
+  PAGO
+}
+
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+}
