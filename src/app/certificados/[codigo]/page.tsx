@@ -169,7 +169,7 @@ export default function CertificadoPage() {
                         data={{
                             NOME_ALUNO: certificado.aluno,
                             NOME_EVENTO: certificado.evento,
-                            CARGA_HORARIA: certificado.cargaHoraria?.toString(),
+                            CARGA_HORARIA: Math.round(Number(certificado.cargaHoraria) || 0).toString(),
                             DATA: formatDate(certificado.metadados?.dataInicio || new Date(), 'dd/MM/yyyy'),
                             CODIGO_VALIDACAO: certificado.codigo
                         }}
@@ -193,7 +193,7 @@ export default function CertificadoPage() {
                             data={{
                                 NOME_ALUNO: certificado.aluno,
                                 NOME_EVENTO: certificado.evento,
-                                CARGA_HORARIA: certificado.cargaHoraria?.toString(),
+                                CARGA_HORARIA: Math.round(Number(certificado.cargaHoraria) || 0).toString(),
                                 DATA: formatDate(certificado.metadados?.dataInicio || new Date(), 'dd/MM/yyyy'),
                                 CODIGO_VALIDACAO: certificado.codigo
                             }}
