@@ -86,19 +86,25 @@ export default function EventoDetalhePage() {
                 <div className="md:col-span-2 space-y-6">
                     {loading ? (
                         <div className="space-y-4">
+                            <Skeleton className="h-[300px] w-full rounded-xl" />
                             <Skeleton className="h-12 w-full" />
                             <div className="flex gap-4">
                                 <Skeleton className="h-4 w-32" />
                                 <Skeleton className="h-4 w-32" />
                             </div>
-                            <div className="space-y-2 pt-6">
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-2/3" />
-                            </div>
                         </div>
                     ) : (
                         <>
+                            {evento.bannerUrl && (
+                                <div className="relative w-full h-[300px] rounded-xl overflow-hidden mb-6 shadow-lg border border-slate-200">
+                                    <img
+                                        src={evento.bannerUrl}
+                                        alt={evento.nome}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                </div>
+                            )}
                             <div>
                                 <h1 className="text-4xl font-bold mb-2 text-primary">{evento.nome}</h1>
                                 <div className="flex gap-4 text-muted-foreground">
@@ -108,8 +114,8 @@ export default function EventoDetalhePage() {
                                 </div>
                             </div>
 
-                            <div className="prose max-w-none text-gray-700">
-                                <p>{evento.descricao}</p>
+                            <div className="prose max-w-none text-gray-700 pt-4">
+                                <p className="whitespace-pre-wrap">{evento.descricao}</p>
                             </div>
                         </>
                     )}

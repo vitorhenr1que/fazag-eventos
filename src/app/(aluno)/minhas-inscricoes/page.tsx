@@ -92,7 +92,17 @@ export default function MinhasInscricoesPage() {
                         return (
                             <Card key={insc.id} className="overflow-hidden border-none shadow-md bg-white">
                                 <CardContent className="p-0 flex flex-col md:flex-row">
-                                    <div className={`w-2 md:w-1 ${insc.status === 'CONFIRMADA' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                    {insc.evento.bannerUrl ? (
+                                        <div className="w-full md:w-32 lg:w-48 aspect-video md:aspect-auto overflow-hidden">
+                                            <img
+                                                src={insc.evento.bannerUrl}
+                                                alt={insc.evento.nome}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className={`w-2 md:w-1 ${insc.status === 'CONFIRMADA' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                    )}
                                     <div className="p-6 flex-1 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                                         <div className="flex-1">
                                             <h3 className="font-bold text-lg text-slate-800">{insc.evento.nome}</h3>

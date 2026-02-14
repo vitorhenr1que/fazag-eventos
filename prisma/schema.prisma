@@ -49,8 +49,9 @@ model Evento {
   updatedAt                DateTime      @updatedAt
   preco                    Decimal?      @db.Decimal(10, 2)
 
-  subeventos Subevento[]
-  inscricoes Inscricao[]
+  subeventos  Subevento[]
+  inscricoes  Inscricao[]
+  certificado Certificado? @relation("EventoCertificado")
 
   @@index([status])
   @@index([dataInicio])
@@ -122,14 +123,22 @@ model CheckIn {
 
 model Certificado {
   id                String   @id @default(cuid()) @db.VarChar(25)
-  inscricaoId       String   @unique @db.VarChar(25)
-  codigoValidacao   String   @unique @db.VarChar(64)
+  inscricaoId       String?  @unique @db.VarChar(25)
+  codigoValidacao   String?  @unique @db.VarChar(64)
   urlPublica        String?  @db.VarChar(255)
-  cargaHorariaTotal Float
+  cargaHorariaTotal Float?
   dataEmissao       DateTime @default(now())
-  metadadosEvento   Json
+  metadadosEvento   Json?
 
-  inscricao Inscricao @relation(fields: [inscricaoId], references: [id])
+  // Relação com Inscrição (Certificado Emitido)
+  inscricao Inscricao? @relation(fields: [inscricaoId], references: [id])
+
+  // Relação com Evento (Configuração/Template)
+  eventoId String? @unique @db.VarChar(25)
+  evento   Evento? @relation("EventoCertificado", fields: [eventoId], references: [id])
+  fundoUrl String? @db.VarChar(255)
+  template Json?
+  ativo    Boolean @default(true)
 
   @@index([codigoValidacao])
   @@map("certificados")

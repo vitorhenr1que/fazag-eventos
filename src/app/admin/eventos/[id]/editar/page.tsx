@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 import { Loader2, ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
 import { formatForInput } from '@/lib/utils'
+import R2ImageUploader from '@/components/admin/R2ImageUploader'
+import CertificateEditor from '@/components/admin/CertificateEditor'
 
 export default function EditarEventoPage() {
     const router = useRouter()
@@ -28,6 +30,11 @@ export default function EditarEventoPage() {
                     ...ev,
                     dataInicio: formatForInput(ev.dataInicio),
                     dataFim: formatForInput(ev.dataFim),
+                    certificado: ev.certificado || {
+                        fundoUrl: '',
+                        template: null,
+                        ativo: true
+                    }
                 })
             }
             setLoading(false)
@@ -47,6 +54,9 @@ export default function EditarEventoPage() {
         try {
             const { _count, subeventos, ...payload } = formData // Remover dados computados/relacionados
 
+            // Extrair campos do certificado para o upsert
+            const { id: certId, eventoId: certEvId, ...certData } = payload.certificado
+
             const res = await apiFetch(`/api/admin/eventos/${params.id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
@@ -57,6 +67,7 @@ export default function EditarEventoPage() {
                     preco: payload.tipo === 'PAGO' ? Number(payload.preco) : null,
                     dataInicio: new Date(payload.dataInicio).toISOString(),
                     dataFim: new Date(payload.dataFim).toISOString(),
+                    certificado: certData // Enviar dados para o upsert no repo
                 }),
                 isAdmin: true
             })
@@ -79,31 +90,31 @@ export default function EditarEventoPage() {
     if (!formData) return <div className="p-8 text-center text-red-500">Erro ao carregar os dados do evento.</div>
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6 pb-20">
             <Link href="/admin/eventos" className="flex items-center text-sm text-slate-500 hover:text-primary transition">
                 <ArrowLeft size={16} className="mr-2" /> Cancelar edição
             </Link>
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+            <Card className="border-none shadow-md bg-white">
+                <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 pb-4">
                     <CardTitle>Editar Evento: {formData?.nome}</CardTitle>
                     <div className="flex gap-2">
                         {formData?.temSubeventos && (
-                            <Button variant="outline" asChild>
+                            <Button variant="outline" asChild size="sm">
                                 <Link href={`/admin/eventos/${params.id}/subeventos`}>Gerenciar Subeventos</Link>
                             </Button>
                         )}
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                <CardContent className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-8">
                         <div className="grid gap-6 md:grid-cols-2">
                             <div className="md:col-span-2">
                                 <label className="text-sm font-medium mb-1 block">Nome do Evento</label>
                                 <input
                                     type="text"
                                     required
-                                    className="w-full p-2 border rounded"
+                                    className="w-full p-2 border rounded focus:ring-2 focus:ring-primary/20 outline-none"
                                     value={formData.nome}
                                     onChange={e => setFormData({ ...formData, nome: e.target.value })}
                                 />
@@ -152,9 +163,18 @@ export default function EditarEventoPage() {
                                 <input
                                     type="text"
                                     required
-                                    className="w-full p-2 border rounded"
+                                    className="w-full p-2 border rounded focus:ring-2 focus:ring-primary/20 outline-none"
                                     value={formData.local || ''}
                                     onChange={e => setFormData({ ...formData, local: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <R2ImageUploader
+                                    label="Banner do Evento"
+                                    currentUrl={formData.bannerUrl}
+                                    eventoId={params.id as string}
+                                    onUploadSuccess={(url) => setFormData({ ...formData, bannerUrl: url })}
                                 />
                             </div>
 
@@ -162,7 +182,7 @@ export default function EditarEventoPage() {
                                 <label className="text-sm font-medium mb-1 block">Descrição</label>
                                 <textarea
                                     rows={4}
-                                    className="w-full p-2 border rounded"
+                                    className="w-full p-2 border rounded focus:ring-2 focus:ring-primary/20 outline-none"
                                     value={formData.descricao || ''}
                                     onChange={e => setFormData({ ...formData, descricao: e.target.value })}
                                 />
@@ -215,50 +235,62 @@ export default function EditarEventoPage() {
                                 </select>
                             </div>
 
-                            <div className="md:col-span-2 border-t pt-6 mt-2">
-                                <h3 className="font-semibold mb-4 text-slate-700">Configurações de Subeventos</h3>
-                                <div className="flex items-center gap-2 mb-4">
+                            <div className="md:col-span-2 border-t pt-8 mt-2">
+                                <h3 className="font-bold text-lg mb-4 text-slate-800">Carga Horária e Subeventos</h3>
+                                <div className="flex items-center gap-2 mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
                                     <input
                                         type="checkbox"
                                         id="temSubeventos"
                                         checked={formData.temSubeventos}
                                         onChange={e => setFormData({ ...formData, temSubeventos: e.target.checked })}
-                                        className="h-4 w-4"
+                                        className="h-5 w-5 text-primary rounded"
                                     />
-                                    <label htmlFor="temSubeventos" className="text-sm font-medium cursor-pointer">
+                                    <label htmlFor="temSubeventos" className="text-sm font-semibold cursor-pointer text-slate-700">
                                         Este evento possui subeventos (Workshops, Palestras específicas)?
                                     </label>
                                 </div>
 
                                 {!formData.temSubeventos ? (
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Carga Horária Base (horas)</label>
+                                    <div className="bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+                                        <label className="text-sm font-bold mb-1 block text-slate-700">Carga Horária Base (horas)</label>
                                         <input
                                             type="number"
                                             step="0.5"
-                                            className="w-full p-2 border rounded md:w-1/2"
+                                            className="w-full p-2 border rounded md:w-1/3 outline-none focus:ring-2 focus:ring-primary/20"
                                             value={formData.cargaHorariaBase || ''}
                                             onChange={e => setFormData({ ...formData, cargaHorariaBase: Number(e.target.value) })}
                                         />
-                                        <p className="text-xs text-slate-400 mt-1">Será usada no certificado final. Ex: 2 ou 1.5</p>
+                                        <p className="text-[10px] text-slate-500 mt-2 italic">* Essa carga horária será impressa no certificado único do evento.</p>
                                     </div>
                                 ) : (
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Limite de subeventos por Aluno</label>
+                                    <div className="bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+                                        <label className="text-sm font-bold mb-1 block text-slate-700">Limite de subeventos por Aluno</label>
                                         <input
                                             type="number"
-                                            className="w-full p-2 border rounded md:w-1/2"
+                                            className="w-full p-2 border rounded md:w-1/3 outline-none focus:ring-2 focus:ring-primary/20"
                                             value={formData.limiteSubeventosPorAluno || 0}
                                             onChange={e => setFormData({ ...formData, limiteSubeventosPorAluno: Number(e.target.value) })}
                                         />
-                                        <p className="text-xs text-slate-400 mt-1">Ex: O aluno pode escolher até 3 workshops. (0 = Ilimitado)</p>
+                                        <p className="text-[10px] text-slate-500 mt-2 italic">* 0 = Sem limite. O aluno pode se inscrever em todas as atividades.</p>
                                     </div>
                                 )}
                             </div>
+
+                            {/* SEÇÃO DE CERTIFICADO */}
+                            <div className="md:col-span-2 pt-8 border-t">
+                                <CertificateEditor
+                                    config={formData.certificado}
+                                    onChange={(config) => setFormData({ ...formData, certificado: config })}
+                                    eventoId={params.id as string}
+                                    eventoNome={formData.nome}
+                                    cargaHoraria={formData.cargaHorariaBase}
+                                    dataInicio={formData.dataInicio}
+                                />
+                            </div>
                         </div>
 
-                        <div className="flex justify-end pt-6 border-t">
-                            <Button type="submit" size="lg" disabled={saving}>
+                        <div className="flex justify-end pt-8 border-t">
+                            <Button type="submit" size="lg" disabled={saving} className="h-12 px-8 font-bold shadow-lg shadow-primary/20">
                                 {saving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" size={20} />}
                                 Salvar Alterações
                             </Button>

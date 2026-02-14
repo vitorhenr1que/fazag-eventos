@@ -63,7 +63,18 @@ export default function EventosPage() {
 
                         return (
                             <Card key={evento.id} className="group overflow-hidden flex flex-col border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-white/50 backdrop-blur-sm">
-                                <div className="h-2 w-full bg-gradient-to-r from-blue-600 to-indigo-600" />
+                                {evento.bannerUrl ? (
+                                    <div className="h-40 w-full overflow-hidden relative">
+                                        <img
+                                            src={evento.bannerUrl}
+                                            alt={evento.nome}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                    </div>
+                                ) : (
+                                    <div className="h-2 w-full bg-gradient-to-r from-blue-600 to-indigo-600" />
+                                )}
                                 <CardHeader className="pb-4">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full ${evento.tipo === 'PAGO' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>

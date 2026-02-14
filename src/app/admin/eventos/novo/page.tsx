@@ -6,8 +6,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Loader2, ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
+import R2ImageUploader from '@/components/admin/R2ImageUploader'
+import CertificateEditor from '@/components/admin/CertificateEditor'
 
 export default function NovoEventoPage() {
     const router = useRouter()
@@ -25,7 +27,13 @@ export default function NovoEventoPage() {
         temSubeventos: false,
         cargaHorariaBase: 2,
         limiteSubeventosPorAluno: 0,
-        preco: 0
+        preco: 0,
+        bannerUrl: '',
+        certificado: {
+            fundoUrl: '',
+            template: null, // O editor usará o default se for null
+            ativo: true
+        } as any
     })
 
     // Auto-gerar slug simples a partir do nome
@@ -74,17 +82,17 @@ export default function NovoEventoPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6 pb-20">
             <Link href="/admin/eventos" className="flex items-center text-sm text-slate-500 hover:text-primary transition">
                 <ArrowLeft size={16} className="mr-2" /> Voltar para lista
             </Link>
 
-            <Card>
+            <Card className="border-none shadow-md bg-white">
                 <CardHeader>
                     <CardTitle>Criar Novo Evento</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-8">
                         <div className="grid gap-6 md:grid-cols-2">
                             <div className="md:col-span-2">
                                 <label className="text-sm font-medium mb-1 block">Nome do Evento</label>
@@ -148,10 +156,17 @@ export default function NovoEventoPage() {
                             </div>
 
                             <div className="md:col-span-2">
+                                <R2ImageUploader
+                                    label="Banner do Evento"
+                                    onUploadSuccess={(url) => setFormData({ ...formData, bannerUrl: url })}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
                                 <label className="text-sm font-medium mb-1 block">Descrição</label>
                                 <textarea
                                     rows={4}
-                                    className="w-full p-2 border rounded"
+                                    className="w-full p-2 border rounded focus:ring-2 focus:ring-primary/20 outline-none"
                                     value={formData.descricao}
                                     onChange={e => setFormData({ ...formData, descricao: e.target.value })}
                                 />
@@ -202,52 +217,63 @@ export default function NovoEventoPage() {
                                 </select>
                             </div>
 
-                            <div className="md:col-span-2 border-t pt-6 mt-2">
-                                <h3 className="font-semibold mb-4 text-slate-700">Configurações de Subeventos</h3>
-                                <div className="flex items-center gap-2 mb-4">
+                            <div className="md:col-span-2 border-t pt-8 mt-2">
+                                <h3 className="font-bold text-lg mb-4 text-slate-800">Carga Horária e Subeventos</h3>
+                                <div className="flex items-center gap-2 mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
                                     <input
                                         type="checkbox"
                                         id="temSubeventos"
                                         checked={formData.temSubeventos}
                                         onChange={e => setFormData({ ...formData, temSubeventos: e.target.checked })}
-                                        className="h-4 w-4"
+                                        className="h-5 w-5 text-primary rounded"
                                     />
-                                    <label htmlFor="temSubeventos" className="text-sm font-medium cursor-pointer">
+                                    <label htmlFor="temSubeventos" className="text-sm font-semibold cursor-pointer text-slate-700">
                                         Este evento possui subeventos (Workshops, Palestras específicas)?
                                     </label>
                                 </div>
 
                                 {!formData.temSubeventos ? (
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Carga Horária Base (horas)</label>
+                                    <div className="bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+                                        <label className="text-sm font-bold mb-1 block text-slate-700">Carga Horária Base (horas)</label>
                                         <input
                                             type="number"
                                             step="0.5"
-                                            className="w-full p-2 border rounded md:w-1/2"
+                                            className="w-full p-2 border rounded md:w-1/3 outline-none focus:ring-2 focus:ring-primary/20"
                                             value={formData.cargaHorariaBase}
                                             onChange={e => setFormData({ ...formData, cargaHorariaBase: Number(e.target.value) })}
                                         />
-                                        <p className="text-xs text-slate-400 mt-1">Será usada no certificado final. Ex: 2 ou 1.5</p>
+                                        <p className="text-[10px] text-slate-500 mt-2 italic">* Essa carga horária será impressa no certificado único do evento.</p>
                                     </div>
                                 ) : (
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Limite de subeventos por Aluno</label>
+                                    <div className="bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+                                        <label className="text-sm font-bold mb-1 block text-slate-700">Limite de subeventos por Aluno</label>
                                         <input
                                             type="number"
-                                            className="w-full p-2 border rounded md:w-1/2"
+                                            className="w-full p-2 border rounded md:w-1/3 outline-none focus:ring-2 focus:ring-primary/20"
                                             value={formData.limiteSubeventosPorAluno}
                                             onChange={e => setFormData({ ...formData, limiteSubeventosPorAluno: Number(e.target.value) })}
                                         />
-                                        <p className="text-xs text-slate-400 mt-1">Ex: O aluno pode escolher até 3 workshops. (0 = Ilimitado)</p>
+                                        <p className="text-[10px] text-slate-500 mt-2 italic">* 0 = Sem limite. O aluno pode se inscrever em todas as atividades.</p>
                                     </div>
                                 )}
                             </div>
+
+                            {/* SEÇÃO DE CERTIFICADO */}
+                            <div className="md:col-span-2 pt-8 border-t">
+                                <CertificateEditor
+                                    config={formData.certificado}
+                                    onChange={(config) => setFormData({ ...formData, certificado: config })}
+                                    eventoNome={formData.nome}
+                                    cargaHoraria={formData.cargaHorariaBase}
+                                    dataInicio={formData.dataInicio}
+                                />
+                            </div>
                         </div>
 
-                        <div className="flex justify-end pt-6 border-t">
-                            <Button type="submit" size="lg" disabled={loading} className="w-full md:w-auto">
-                                {loading ? <Loader2 className="animate-spin mr-2" /> : null}
-                                Salvar Evento
+                        <div className="flex justify-end pt-8 border-t">
+                            <Button type="submit" size="lg" disabled={loading} className="w-full md:w-auto h-12 px-8 text-lg font-bold shadow-lg shadow-primary/20">
+                                {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+                                Criar Evento e Configurar
                             </Button>
                         </div>
                     </form>

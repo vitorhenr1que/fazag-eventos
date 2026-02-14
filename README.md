@@ -127,3 +127,24 @@ x-aluno-id: ADM200026
 
 ---
 Desenvolvido com Next.js 14+ (App Router), Prisma e Tailwind CSS.
+
+## ☁️ Configuração Cloudflare R2 (CORS)
+
+Para permitir o upload direto de banners do navegador para o R2, você deve configurar o CORS no bucket `fazag-eventos`:
+
+1. Acesse o painel Cloudflare > R2 > Buckets > **fazag-eventos**.
+2. Vá na aba **Settings** > **CORS Policy**.
+3. Adicione a seguinte configuração JSON:
+
+```json
+[
+  {
+    "AllowedOrigins": ["http://localhost:3000", "https://fazag.edu.br", "https://cdn.fazag.edu.br"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+*(Nota: Certifique-se de incluir o domínio administrativo se for diferente dos listados).*

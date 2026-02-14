@@ -73,11 +73,18 @@ export default function LandingPage() {
                         ) : (
                             eventos.map((evento) => (
                                 <Card key={evento.id} className="group relative flex flex-col overflow-hidden rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                                    <div className="aspect-[16/9] bg-slate-200 overflow-hidden">
-                                        {/* Placeholder para imagem ou gradiente */}
-                                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                                            <Calendar size={48} className="text-primary/40" />
-                                        </div>
+                                    <div className="aspect-[16/9] bg-slate-200 overflow-hidden relative">
+                                        {evento.bannerUrl ? (
+                                            <img
+                                                src={evento.bannerUrl}
+                                                alt={evento.nome}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+                                                <Calendar size={48} className="text-primary/40" />
+                                            </div>
+                                        )}
                                     </div>
                                     <CardContent className="flex flex-1 flex-col p-6">
                                         <div className="flex items-center gap-x-4 text-xs mb-4">

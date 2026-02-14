@@ -15,6 +15,7 @@ export class InscricaoRepository {
             include: {
                 evento: {
                     include: {
+                        certificado: true,
                         subeventos: {
                             include: {
                                 _count: {

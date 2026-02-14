@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { getAdminFromHeader } from '@/lib/auth-admin'
 import { EventoService } from '@/services/evento.service'
 import { handleApiError } from '@/lib/app-error'
 import { z } from 'zod'
@@ -18,12 +19,15 @@ const adminCreateEventoSchema = z.object({
     cargaHorariaBase: z.number().optional().nullable(),
     limiteSubeventosPorAluno: z.number().int().optional().nullable(),
     preco: z.number().optional().nullable(),
+    bannerUrl: z.string().url().optional().nullable().or(z.literal('')),
 })
 
 const eventoService = new EventoService()
 
 export async function POST(request: NextRequest) {
     try {
+        await getAdminFromHeader(request);
+
         const body = await request.json()
         const data = adminCreateEventoSchema.parse(body)
 

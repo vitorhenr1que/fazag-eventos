@@ -25,7 +25,8 @@ export async function GET(
                             select: { inscricoesSubevento: true }
                         }
                     }
-                }
+                },
+                certificado: true
             } as any
         })
 
