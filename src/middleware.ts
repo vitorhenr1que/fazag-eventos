@@ -33,8 +33,12 @@ export function middleware(request: NextRequest) {
         }
     }
 
-    // 2. Validar rotas de API de ALUNO (/api/* exceto admin, r2 e públicas)
-    if (path.startsWith('/api') && !path.startsWith('/api/admin') && !path.startsWith('/api/r2')) {
+    // 2. Validar rotas de API de ALUNO (/api/* exceto admin, r2, internal e públicas)
+    if (path.startsWith('/api') &&
+        !path.startsWith('/api/admin') &&
+        !path.startsWith('/api/r2') &&
+        !path.startsWith('/api/internal')
+    ) {
         // Permitir rotas públicas de aluno
         if (path === '/api/alunos' || path.includes('/certificados/validar')) {
             return NextResponse.next()
