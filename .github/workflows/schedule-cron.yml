@@ -1,0 +1,16 @@
+name: Expire Eventos Job
+
+on:
+  schedule:
+    # Roda a cada 5 minutos
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  expire_eventos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamada da API de Expiração
+        run: |
+          curl -X GET "https://seu-dominio-da-vercel.vercel.app/api/internal/jobs/expire-eventos" \
+          -H "x-job-secret: ${{ secrets.JOB_SECRET }}"
