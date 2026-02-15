@@ -12,5 +12,5 @@ jobs:
     steps:
       - name: Chamada da API de Expiração
         run: |
-          curl -X GET "https://seu-dominio-da-vercel.vercel.app/api/internal/jobs/expire-eventos" \
+          curl -X GET "https://eventos.fazag.edu.br/api/internal/jobs/expire-eventos" \
           -H "x-job-secret: ${{ secrets.JOB_SECRET }}"
