@@ -57,7 +57,7 @@ Este projeto é um sistema completo de gestão de eventos acadêmicos, permitind
    npm run prisma:seed
    ```
    *Dados criados:*
-   - **Admin:** `admin@faculdade.com` / `admin123`
+   - **Admin:** `nuppex@fazag.edu.br` / `fazagfaz1`
    - **Alunos:** IDs `ADM200026` e `ADM200027`
    - **Evento 1:** "Palestra de Inovação" (Simples)
    - **Evento 2:** "Semana de Tecnologia" (Com Subeventos)
@@ -88,7 +88,7 @@ Em desenvolvimento, o frontend usa o valor de `NEXT_PUBLIC_ALUNO_ID` do `.env`.
 ### 🔑 Área Administrativa
 
 1. Acesse `/admin/login`.
-2. Entre com: `admin@faculdade.com` / `admin123`.
+2. Entre com: `email@fazag.edu.br` / `senha`.
 3. (Funcionalidades de Dashboard Admin ainda em desenvolvimento, mas login gera token JWT válido no LocalStorage).
 
 ### 📡 Teste de API (Exemplos CURL / .http)
@@ -105,8 +105,8 @@ POST http://localhost:3000/api/admin/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@faculdade.com",
-  "senha": "admin123"
+  "email": "nuppex@fazag.edu.br",
+  "senha": "fazagfaz1"
 }
 ```
 

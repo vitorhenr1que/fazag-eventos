@@ -7,8 +7,8 @@ async function main() {
     console.log('🌱 Iniciando seed...')
 
     // 1. Criar Admin
-    const adminEmail = 'admin@faculdade.com'
-    const adminSenha = await bcrypt.hash('admin123', 10)
+    const adminEmail = 'nuppex@fazag.edu.br'
+    const adminSenha = await bcrypt.hash('fazagfaz1', 10)
 
     const admin = await prisma.admin.upsert({
         where: { email: adminEmail },
