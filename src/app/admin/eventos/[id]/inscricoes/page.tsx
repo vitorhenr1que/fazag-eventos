@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft, Users, CheckCircle, CreditCard, Check } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, CreditCard, Check, FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -16,6 +16,7 @@ export default function InscricoesEventoPage() {
     const [evento, setEvento] = useState<any>(null)
     const [inscricoes, setInscricoes] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [exporting, setExporting] = useState<string | null>(null)
 
     useEffect(() => {
         async function load() {
@@ -136,6 +137,279 @@ export default function InscricoesEventoPage() {
         }
     }
 
+    function sanitizeFileName(value: string) {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9-_]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .toLowerCase() || 'evento'
+    }
+
+    function escapeHtml(value: unknown) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+    }
+
+    function csvCell(value: unknown) {
+        const text = String(value ?? '').replace(/\r?\n|\r/g, ' ')
+        return `"${text.replace(/"/g, '""')}"`
+    }
+
+    function getSubeventosResumo(insc: any) {
+        if (!insc.subeventosEscolhidos?.length) return ''
+
+        return insc.subeventosEscolhidos
+            .map((se: any) => `${se.subevento.nome} (${se.checkIn ? 'Presente' : 'Ausente'})`)
+            .join('; ')
+    }
+
+    function getEventoPeriodo() {
+        if (!evento?.dataInicio || !evento?.dataFim) return ''
+        return `${formatDate(evento.dataInicio, 'dd/MM/yyyy HH:mm')} a ${formatDate(evento.dataFim, 'dd/MM/yyyy HH:mm')}`
+    }
+
+    function downloadFile(content: string, fileName: string, type: string) {
+        const blob = new Blob([content], { type })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+    }
+
+    function handleExportCsv() {
+        if (!inscricoes.length) {
+            toast.info('Nenhuma inscricao para exportar.')
+            return
+        }
+
+        setExporting('csv')
+        try {
+            const headers = [
+                'Nome',
+                'Matricula/ID',
+                'E-mail',
+                'Data da inscricao',
+                'Status',
+                'Presenca geral',
+                'Subeventos',
+                'Carga horaria certificado',
+                'Codigo certificado'
+            ]
+
+            const rows = inscricoes.map((insc) => [
+                insc.aluno?.nome,
+                insc.aluno?.id,
+                insc.aluno?.email,
+                formatDate(insc.dataInscricao, 'dd/MM/yyyy HH:mm'),
+                insc.status,
+                insc.checkIn ? 'Presente' : 'Ausente',
+                getSubeventosResumo(insc),
+                insc.certificado?.cargaHorariaTotal ?? '',
+                insc.certificado?.codigoValidacao ?? ''
+            ])
+
+            const csv = [headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n')
+            const fileName = `inscricoes-${sanitizeFileName(evento?.nome || String(params.id))}.csv`
+
+            downloadFile(`\uFEFF${csv}`, fileName, 'text/csv;charset=utf-8;')
+            toast.success('CSV exportado com sucesso.')
+        } finally {
+            setExporting(null)
+        }
+    }
+
+    function openPrintDocument(title: string, body: string) {
+        const printWindow = window.open('', '_blank', 'width=1200,height=800')
+
+        if (!printWindow) {
+            toast.error('Nao foi possivel abrir a janela de impressao. Verifique o bloqueador de pop-ups.')
+            return
+        }
+
+        printWindow.document.write(`
+            <!doctype html>
+            <html lang="pt-BR">
+                <head>
+                    <meta charset="utf-8" />
+                    <title>${escapeHtml(title)}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: Arial, Helvetica, sans-serif;
+                            color: #0f172a;
+                            margin: 32px;
+                            font-size: 12px;
+                        }
+                        header {
+                            border-bottom: 2px solid #0f172a;
+                            padding-bottom: 16px;
+                            margin-bottom: 20px;
+                        }
+                        h1 {
+                            font-size: 22px;
+                            margin: 0 0 8px;
+                        }
+                        .meta {
+                            color: #475569;
+                            line-height: 1.5;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            page-break-inside: auto;
+                        }
+                        thead {
+                            display: table-header-group;
+                        }
+                        tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        th, td {
+                            border: 1px solid #cbd5e1;
+                            padding: 8px;
+                            vertical-align: top;
+                            text-align: left;
+                        }
+                        th {
+                            background: #f1f5f9;
+                            font-size: 10px;
+                            text-transform: uppercase;
+                            letter-spacing: .04em;
+                        }
+                        .center {
+                            text-align: center;
+                        }
+                        .signature {
+                            height: 42px;
+                            min-width: 150px;
+                        }
+                        @page {
+                            size: A4 landscape;
+                            margin: 12mm;
+                        }
+                        @media print {
+                            body { margin: 0; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <header>
+                        <h1>${escapeHtml(title)}</h1>
+                        <div class="meta">
+                            <div><strong>Evento:</strong> ${escapeHtml(evento?.nome || '-')}</div>
+                            <div><strong>Periodo:</strong> ${escapeHtml(getEventoPeriodo() || '-')}</div>
+                            <div><strong>Local:</strong> ${escapeHtml(evento?.local || '-')}</div>
+                            <div><strong>Total:</strong> ${inscricoes.length} inscrito(s)</div>
+                        </div>
+                    </header>
+                    ${body}
+                    <script>
+                        window.onload = () => {
+                            window.focus();
+                            window.print();
+                        };
+                    </script>
+                </body>
+            </html>
+        `)
+        printWindow.document.close()
+    }
+
+    function handleExportInscricoesPdf() {
+        if (!inscricoes.length) {
+            toast.info('Nenhuma inscricao para exportar.')
+            return
+        }
+
+        setExporting('inscricoes-pdf')
+        try {
+            const rows = inscricoes.map((insc, index) => `
+                <tr>
+                    <td class="center">${index + 1}</td>
+                    <td>
+                        <strong>${escapeHtml(insc.aluno?.nome)}</strong><br />
+                        ID: ${escapeHtml(insc.aluno?.id)}
+                        ${insc.aluno?.email ? `<br />${escapeHtml(insc.aluno.email)}` : ''}
+                    </td>
+                    <td>${escapeHtml(formatDate(insc.dataInscricao, 'dd/MM/yyyy HH:mm'))}</td>
+                    <td class="center">${escapeHtml(insc.status)}</td>
+                    <td class="center">${insc.checkIn ? 'Presente' : 'Ausente'}</td>
+                    <td>${escapeHtml(getSubeventosResumo(insc) || '-')}</td>
+                    <td class="center">${escapeHtml(insc.certificado?.cargaHorariaTotal ? `${insc.certificado.cargaHorariaTotal}h` : '-')}</td>
+                </tr>
+            `).join('')
+
+            openPrintDocument('Lista de Inscricoes', `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Aluno / Matricula</th>
+                            <th>Inscricao</th>
+                            <th>Status</th>
+                            <th>Presenca Geral</th>
+                            <th>Subeventos</th>
+                            <th>Certificado</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `)
+        } finally {
+            setExporting(null)
+        }
+    }
+
+    function handleExportPresencaPdf() {
+        if (!inscricoes.length) {
+            toast.info('Nenhuma inscricao para exportar.')
+            return
+        }
+
+        setExporting('presenca-pdf')
+        try {
+            const rows = inscricoes.map((insc, index) => `
+                <tr>
+                    <td class="center">${index + 1}</td>
+                    <td>
+                        <strong>${escapeHtml(insc.aluno?.nome)}</strong><br />
+                        ID: ${escapeHtml(insc.aluno?.id)}
+                    </td>
+                    <td class="center">${escapeHtml(insc.status)}</td>
+                    <td class="center">${insc.checkIn ? 'Presente' : 'Ausente'}</td>
+                    <td class="signature"></td>
+                </tr>
+            `).join('')
+
+            openPrintDocument('Lista de Presenca', `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Aluno / Matricula</th>
+                            <th>Status</th>
+                            <th>Check-in</th>
+                            <th>Assinatura</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `)
+        } finally {
+            setExporting(null)
+        }
+    }
+
     return (
         <div className="space-y-6 container py-8 mx-auto max-w-7xl">
             <div className="flex items-center justify-between">
@@ -155,8 +429,19 @@ export default function InscricoesEventoPage() {
                     )}
                 </div>
                 {!loading && (
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm">Exportar CSV</Button>
+                    <div className="flex flex-wrap justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!!exporting || inscricoes.length === 0}>
+                            {exporting === 'csv' ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Download size={14} className="mr-2" />}
+                            Exportar CSV
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleExportInscricoesPdf} disabled={!!exporting || inscricoes.length === 0}>
+                            {exporting === 'inscricoes-pdf' ? <Loader2 size={14} className="mr-2 animate-spin" /> : <FileText size={14} className="mr-2" />}
+                            Inscrições PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleExportPresencaPdf} disabled={!!exporting || inscricoes.length === 0}>
+                            {exporting === 'presenca-pdf' ? <Loader2 size={14} className="mr-2 animate-spin" /> : <FileText size={14} className="mr-2" />}
+                            Presença PDF
+                        </Button>
                     </div>
                 )}
             </div>
