@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { handleApiError } from '@/lib/app-error'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ codigo: string }> }
@@ -25,7 +27,13 @@ export async function GET(
         })
 
         if (!certificado || !certificado.inscricao) {
-            return NextResponse.json({ success: false, error: 'Certificado inválido ou não encontrado' }, { status: 404 })
+            return NextResponse.json(
+                { success: false, error: 'Certificado inválido ou não encontrado' },
+                {
+                    status: 404,
+                    headers: { 'Cache-Control': 'no-store' }
+                }
+            )
         }
 
         // Recuperar o template da configuração do evento
@@ -40,20 +48,25 @@ export async function GET(
         }
 
         // Retorna dados públicos seguros
-        return NextResponse.json({
-            success: true,
-            data: {
-                aluno: certificado.inscricao?.aluno?.nome,
-                evento: certificado.inscricao?.evento?.nome,
-                cargaHoraria: certificado.cargaHorariaTotal,
-                dataEmissao: certificado.dataEmissao,
-                codigo: certificado.codigoValidacao,
-                // Dados para renderização visual
-                template: template,
-                fundoUrl: fundoUrl,
-                metadados: certificado.metadadosEvento
+        return NextResponse.json(
+            {
+                success: true,
+                data: {
+                    aluno: certificado.inscricao?.aluno?.nome,
+                    evento: certificado.inscricao?.evento?.nome,
+                    cargaHoraria: certificado.cargaHorariaTotal,
+                    dataEmissao: certificado.dataEmissao,
+                    codigo: certificado.codigoValidacao,
+                    // Dados para renderização visual
+                    template: template,
+                    fundoUrl: fundoUrl,
+                    metadados: certificado.metadadosEvento
+                }
+            },
+            {
+                headers: { 'Cache-Control': 'no-store' }
             }
-        })
+        )
     } catch (error) {
         return handleApiError(error)
     }

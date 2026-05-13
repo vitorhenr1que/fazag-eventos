@@ -11,6 +11,7 @@ export async function GET(
         const evento = await prisma.evento.findUnique({
             where: { id },
             include: {
+                tipoAtividade: true,
                 _count: {
                     select: {
                         inscricoes: {

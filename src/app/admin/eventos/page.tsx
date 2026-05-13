@@ -29,6 +29,16 @@ export default function AdminEventosPage() {
         load()
     }, [])
 
+    const translateStatus = (status: string) => {
+        const translations: { [key: string]: string } = {
+            'DRAFT': 'Rascunho',
+            'PUBLISHED': 'Publicado',
+            'FINISHED': 'Encerrado',
+            'CANCELLED': 'Cancelado'
+        }
+        return translations[status] || status
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -80,7 +90,7 @@ export default function AdminEventosPage() {
                                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${e.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' :
                                             e.status === 'DRAFT' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'
                                             }`}>
-                                            {e.status}
+                                            {translateStatus(e.status)}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600">

@@ -32,9 +32,9 @@ export async function DELETE(
         const { inscricaoId } = await params
         await getAdminFromHeader(request)
 
-        await inscricaoService.adminExcluirCertificado(inscricaoId)
+        const result = await inscricaoService.adminExcluirCertificado(inscricaoId)
 
-        return NextResponse.json({ success: true })
+        return NextResponse.json({ success: true, data: result })
     } catch (error) {
         return handleApiError(error)
     }

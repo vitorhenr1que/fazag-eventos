@@ -4,7 +4,7 @@ import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Calendar, LogOut, Users, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Calendar, LogOut, CreditCard, Tags } from 'lucide-react'
 import { Toaster } from 'sonner'
 
 export default function AdminLayout({
@@ -57,6 +57,9 @@ export default function AdminLayout({
                     </Link>
                     <Link href="/admin/eventos" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/eventos' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
                         <Calendar size={20} /> Eventos
+                    </Link>
+                    <Link href="/admin/tipos-atividade" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/tipos-atividade' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
+                        <Tags size={20} /> Tipos de Atividade
                     </Link>
                     <Link href="/admin/inscricoes/pendentes" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/inscricoes/pendentes' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
                         <CreditCard size={20} /> Pendentes

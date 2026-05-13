@@ -12,22 +12,42 @@ import { formatForInput } from '@/lib/utils'
 import R2ImageUploader from '@/components/admin/R2ImageUploader'
 import CertificateEditor from '@/components/admin/CertificateEditor'
 
+type TipoAtividade = {
+    id: string
+    nome: string
+    descricao: string
+    cargaHorariaMaxima: number
+    porcentagemAnual: number
+}
+
 export default function EditarEventoPage() {
     const router = useRouter()
     const params = useParams()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState<any>(null)
+    const [tiposAtividade, setTiposAtividade] = useState<TipoAtividade[]>([])
 
     useEffect(() => {
         async function load() {
-            const res = await apiFetch(`/api/eventos/${params.id}`)
+            const [eventoRes, tiposRes] = await Promise.all([
+                apiFetch(`/api/eventos/${params.id}`),
+                apiFetch('/api/admin/tipos-atividade', { isAdmin: true })
+            ])
+
+            if (tiposRes.ok) {
+                const json = await tiposRes.json()
+                setTiposAtividade(json.data)
+            }
+
+            const res = eventoRes
             if (res.ok) {
                 const json = await res.json()
                 const ev = json.data
 
                 setFormData({
                     ...ev,
+                    tipoAtividadeId: ev.tipoAtividadeId || '',
                     dataInicio: formatForInput(ev.dataInicio),
                     dataFim: formatForInput(ev.dataFim),
                     certificado: ev.certificado || {
@@ -44,6 +64,11 @@ export default function EditarEventoPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (!formData.tipoAtividadeId) {
+            toast.error('Selecione o tipo de atividade do evento')
+            return
+        }
 
         if (new Date(formData.dataInicio) >= new Date(formData.dataFim)) {
             toast.error('A data de início deve ser anterior à data de término')
@@ -85,6 +110,8 @@ export default function EditarEventoPage() {
             setSaving(false)
         }
     }
+
+    const tipoAtividadeSelecionado = tiposAtividade.find((tipo) => tipo.id === formData?.tipoAtividadeId)
 
     if (loading) return <div className="p-8 text-center">Carregando dados...</div>
     if (!formData) return <div className="p-8 text-center text-red-500">Erro ao carregar os dados do evento.</div>
@@ -141,6 +168,31 @@ export default function EditarEventoPage() {
                                     <option value="GRATUITO">Gratuito</option>
                                     <option value="PAGO">Pago</option>
                                 </select>
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="text-sm font-medium mb-1 block">Tipo de Atividade</label>
+                                <select
+                                    required
+                                    className="w-full p-2 border rounded"
+                                    value={formData.tipoAtividadeId || ''}
+                                    onChange={e => setFormData({ ...formData, tipoAtividadeId: e.target.value })}
+                                >
+                                    <option value="">Selecione o tipo de atividade</option>
+                                    {tiposAtividade.map((tipo) => (
+                                        <option key={tipo.id} value={tipo.id}>
+                                            {tipo.nome}
+                                        </option>
+                                    ))}
+                                </select>
+                                {tipoAtividadeSelecionado && (
+                                    <div className="mt-2 rounded border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+                                        <p>{tipoAtividadeSelecionado.descricao}</p>
+                                        <p className="mt-2 font-semibold text-slate-700">
+                                            Carga horária máxima: {tipoAtividadeSelecionado.cargaHorariaMaxima}h | Porcentagem anual: {tipoAtividadeSelecionado.porcentagemAnual}%
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {formData.tipo === 'PAGO' && (

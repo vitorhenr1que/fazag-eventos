@@ -12,14 +12,24 @@ import R2ImageUploader from '@/components/admin/R2ImageUploader'
 import CertificateEditor from '@/components/admin/CertificateEditor'
 import { CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY } from '@/lib/certificate-utils'
 
+type TipoAtividade = {
+    id: string
+    nome: string
+    descricao: string
+    cargaHorariaMaxima: number
+    porcentagemAnual: number
+}
+
 export default function NovoEventoPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
+    const [tiposAtividade, setTiposAtividade] = useState<TipoAtividade[]>([])
     const [formData, setFormData] = useState({
         nome: '',
         slug: '',
         descricao: '',
         local: '',
+        tipoAtividadeId: '',
         dataInicio: '',
         dataFim: '',
         totalVagas: 50,
@@ -38,6 +48,16 @@ export default function NovoEventoPage() {
     })
 
     useEffect(() => {
+        async function loadTiposAtividade() {
+            const res = await apiFetch('/api/admin/tipos-atividade', { isAdmin: true })
+            if (!res.ok) return
+
+            const json = await res.json()
+            setTiposAtividade(json.data)
+        }
+
+        loadTiposAtividade()
+
         const savedDefault = localStorage.getItem(CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY)
         if (!savedDefault) return
 
@@ -67,6 +87,11 @@ export default function NovoEventoPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (!formData.tipoAtividadeId) {
+            toast.error('Selecione o tipo de atividade do evento')
+            return
+        }
 
         if (new Date(formData.dataInicio) >= new Date(formData.dataFim)) {
             toast.error('A data de início deve ser anterior à data de término')
@@ -102,6 +127,8 @@ export default function NovoEventoPage() {
             setLoading(false)
         }
     }
+
+    const tipoAtividadeSelecionado = tiposAtividade.find((tipo) => tipo.id === formData.tipoAtividadeId)
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-20">
@@ -148,6 +175,31 @@ export default function NovoEventoPage() {
                                     <option value="GRATUITO">Gratuito</option>
                                     <option value="PAGO">Pago</option>
                                 </select>
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="text-sm font-medium mb-1 block">Tipo de Atividade</label>
+                                <select
+                                    required
+                                    className="w-full p-2 border rounded"
+                                    value={formData.tipoAtividadeId}
+                                    onChange={e => setFormData({ ...formData, tipoAtividadeId: e.target.value })}
+                                >
+                                    <option value="">Selecione o tipo de atividade</option>
+                                    {tiposAtividade.map((tipo) => (
+                                        <option key={tipo.id} value={tipo.id}>
+                                            {tipo.nome}
+                                        </option>
+                                    ))}
+                                </select>
+                                {tipoAtividadeSelecionado && (
+                                    <div className="mt-2 rounded border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+                                        <p>{tipoAtividadeSelecionado.descricao}</p>
+                                        <p className="mt-2 font-semibold text-slate-700">
+                                            Carga horária máxima: {tipoAtividadeSelecionado.cargaHorariaMaxima}h | Porcentagem anual: {tipoAtividadeSelecionado.porcentagemAnual}%
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {formData.tipo === 'PAGO' && (

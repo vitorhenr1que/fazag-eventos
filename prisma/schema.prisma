@@ -37,6 +37,7 @@ model Evento {
   descricao                String?       @db.Text
   local                    String?       @db.VarChar(160)
   bannerUrl                String?       @db.VarChar(255)
+  tipoAtividadeId          String?       @db.VarChar(25)
   status                   EventoStatus  @default(DRAFT)
   tipo                     TipoPagamento @default(GRATUITO)
   dataInicio               DateTime
@@ -52,10 +53,26 @@ model Evento {
   subeventos  Subevento[]
   inscricoes  Inscricao[]
   certificado Certificado? @relation("EventoCertificado")
+  tipoAtividade TipoAtividade? @relation(fields: [tipoAtividadeId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([dataInicio])
+  @@index([tipoAtividadeId])
   @@map("eventos")
+}
+
+model TipoAtividade {
+  id                  String   @id @default(cuid()) @db.VarChar(25)
+  nome                String   @unique @db.VarChar(190)
+  descricao           String   @db.Text
+  cargaHorariaMaxima  Int
+  porcentagemAnual    Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  eventos Evento[]
+
+  @@map("tipos_atividade")
 }
 
 model Subevento {

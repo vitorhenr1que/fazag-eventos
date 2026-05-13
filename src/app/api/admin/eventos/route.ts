@@ -10,6 +10,7 @@ const adminCreateEventoSchema = z.object({
     slug: z.string(),
     descricao: z.string().optional().nullable(),
     local: z.string().optional().nullable(),
+    tipoAtividadeId: z.string().min(1),
     tipo: z.enum(['GRATUITO', 'PAGO']).optional(),
     dataInicio: z.string().transform(str => new Date(str)),
     dataFim: z.string().transform(str => new Date(str)),
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
         const eventos = await prisma.evento.findMany({
             orderBy: { dataInicio: 'desc' },
             include: {
+                tipoAtividade: true,
                 _count: {
                     select: { inscricoes: true }
                 }

@@ -150,7 +150,11 @@ export default function InscricoesEventoPage() {
 
             if (res.ok) {
                 toast.success('Certificado excluído com sucesso!')
-                setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, certificado: null } : i))
+                const resList = await apiFetch(`/api/admin/eventos/${params.id}/inscricoes`, { isAdmin: true })
+                if (resList.ok) {
+                    const json = await resList.json()
+                    setInscricoes(json.data)
+                }
             } else {
                 const json = await res.json()
                 toast.error(json.error?.message || 'Erro ao excluir certificado')

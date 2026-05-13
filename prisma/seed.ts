@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { TIPOS_ATIVIDADE_INICIAIS } from '../src/lib/tipos-atividade'
 
 const prisma = new PrismaClient()
 
@@ -22,7 +23,17 @@ async function main() {
     })
     console.log(`👤 Admin criado: ${admin.email}`)
 
-    // 2. Criar Alunos
+    // 2. Criar Tipos de Atividade
+    for (const tipoAtividade of TIPOS_ATIVIDADE_INICIAIS) {
+        await prisma.tipoAtividade.upsert({
+            where: { nome: tipoAtividade.nome },
+            update: tipoAtividade,
+            create: tipoAtividade
+        })
+    }
+    console.log(`Tipos de atividade criados: ${TIPOS_ATIVIDADE_INICIAIS.length}`)
+
+    // 3. Criar Alunos
     const alunosIds = ['ADM200026', 'ADM200027']
     for (const id of alunosIds) {
         await prisma.aluno.upsert({

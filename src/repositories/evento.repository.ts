@@ -8,6 +8,7 @@ export class EventoRepository {
                 status: 'PUBLISHED'
             },
             include: {
+                tipoAtividade: true,
                 subeventos: true,
                 _count: {
                     select: {
@@ -25,6 +26,7 @@ export class EventoRepository {
         return prisma.evento.findUnique({
             where: { id },
             include: {
+                tipoAtividade: true,
                 subeventos: true,
                 certificado: true,
                 _count: {
@@ -57,7 +59,7 @@ export class EventoRepository {
 
             return tx.evento.findUnique({
                 where: { id: evento.id },
-                include: { certificado: true }
+                include: { certificado: true, tipoAtividade: true }
             })
         })
     }
@@ -72,6 +74,7 @@ export class EventoRepository {
             inscricoes,
             _count,
             certificado,
+            tipoAtividade,
             ...eventData
         } = data
 
@@ -94,7 +97,7 @@ export class EventoRepository {
                 data: {
                     ...eventData
                 },
-                include: { certificado: true }
+                include: { certificado: true, tipoAtividade: true }
             })
         })
     }
