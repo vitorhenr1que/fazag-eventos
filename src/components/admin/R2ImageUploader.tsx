@@ -10,10 +10,11 @@ interface R2ImageUploaderProps {
     currentUrl?: string
     onUploadSuccess: (url: string) => void
     eventoId?: string
-    kind?: 'banner' | 'certificado_fundo'
+    kind?: 'banner' | 'certificado_fundo' | 'certificado_elemento'
     label?: string
     aspectRatio?: string // e.g., "aspect-[3/1]"
     idealSize?: string // e.g., "1200x400"
+    deleteRemoteOnRemove?: boolean
 }
 
 export default function R2ImageUploader({
@@ -23,11 +24,13 @@ export default function R2ImageUploader({
     kind = 'banner',
     label,
     aspectRatio = "aspect-[3/1]",
-    idealSize = "1200x400"
+    idealSize = "1200x400",
+    deleteRemoteOnRemove = false
 }: R2ImageUploaderProps) {
     const [uploading, setUploading] = useState(false)
     const [previewUrl, setPreviewUrl] = useState(currentUrl)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const preserveTransparency = kind === 'certificado_elemento'
 
     // Sincronizar preview se currentUrl mudar (útil ao carregar dados)
     React.useEffect(() => {
@@ -99,8 +102,32 @@ export default function R2ImageUploader({
         }
     }
 
-    const removeImage = (e: React.MouseEvent) => {
+    const removeImage = async (e: React.MouseEvent) => {
         e.stopPropagation()
+
+        if (deleteRemoteOnRemove && previewUrl) {
+            try {
+                const res = await apiFetch('/api/r2/object', {
+                    method: 'DELETE',
+                    body: JSON.stringify({
+                        url: previewUrl,
+                        eventoId,
+                        kind
+                    }),
+                    isAdmin: true
+                })
+
+                if (!res.ok) {
+                    const err = await res.json()
+                    throw new Error(err.error?.message || 'Erro ao excluir imagem do R2')
+                }
+            } catch (err: any) {
+                console.error(err)
+                toast.error(err.message || 'Erro ao excluir imagem do R2')
+                return
+            }
+        }
+
         setPreviewUrl('')
         onUploadSuccess('')
     }
@@ -114,7 +141,7 @@ export default function R2ImageUploader({
                 className={`
                     relative rounded-lg overflow-hidden border-2 border-dashed 
                     ${previewUrl ? 'border-transparent' : 'border-slate-200 hover:border-primary/50 hover:bg-primary/5'} 
-                    ${aspectRatio} bg-slate-50 transition-all cursor-pointer group
+                    ${aspectRatio} ${previewUrl && preserveTransparency ? 'bg-transparent' : 'bg-slate-50'} transition-all cursor-pointer group
                 `}
             >
                 {previewUrl ? (
@@ -122,7 +149,7 @@ export default function R2ImageUploader({
                         <img
                             src={previewUrl}
                             alt="Preview"
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full ${preserveTransparency ? 'object-contain' : 'object-cover'}`}
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                             <Button type="button" variant="secondary" size="sm" className="h-8">

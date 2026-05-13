@@ -290,6 +290,20 @@ export class InscricaoService {
         })
     }
 
+    async adminExcluirCertificado(inscricaoId: string) {
+        const inscricao = await inscricaoRepo.findById(inscricaoId) as any
+        if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
+
+        const certificado = await prisma.certificado.findUnique({ where: { inscricaoId } })
+        if (!certificado) throw new AppError('Certificado não encontrado para esta inscrição', 404)
+
+        await prisma.certificado.delete({
+            where: { id: certificado.id }
+        })
+
+        return { success: true }
+    }
+
     async aprovarInscricao(inscricaoId: string) {
         const inscricao = await inscricaoRepo.findById(inscricaoId) as any
         if (!inscricao) throw new AppError('Inscrição não encontrada', 404)

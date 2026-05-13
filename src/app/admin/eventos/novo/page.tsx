@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
 import R2ImageUploader from '@/components/admin/R2ImageUploader'
 import CertificateEditor from '@/components/admin/CertificateEditor'
+import { CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY } from '@/lib/certificate-utils'
 
 export default function NovoEventoPage() {
     const router = useRouter()
@@ -35,6 +36,27 @@ export default function NovoEventoPage() {
             ativo: true
         } as any
     })
+
+    useEffect(() => {
+        const savedDefault = localStorage.getItem(CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY)
+        if (!savedDefault) return
+
+        try {
+            const parsed = JSON.parse(savedDefault)
+            if (!parsed?.template?.elements) return
+
+            setFormData((current) => ({
+                ...current,
+                certificado: {
+                    fundoUrl: parsed.fundoUrl || parsed.template.background?.url || undefined,
+                    template: parsed.template,
+                    ativo: typeof parsed.ativo === 'boolean' ? parsed.ativo : current.certificado.ativo
+                }
+            }))
+        } catch (err) {
+            console.error('Erro ao carregar modelo padrão de certificado:', err)
+        }
+    }, [])
 
     // Auto-gerar slug simples a partir do nome
     const onNomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {

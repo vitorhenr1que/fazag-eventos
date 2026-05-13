@@ -23,3 +23,19 @@ export async function POST(
         return handleApiError(error)
     }
 }
+
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ inscricaoId: string }> }
+) {
+    try {
+        const { inscricaoId } = await params
+        await getAdminFromHeader(request)
+
+        await inscricaoService.adminExcluirCertificado(inscricaoId)
+
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        return handleApiError(error)
+    }
+}

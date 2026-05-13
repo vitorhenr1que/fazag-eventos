@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Download, Printer, Share2 } from 'lucide-react'
 import CertificateRenderer from '@/components/certificate/CertificateRenderer'
+import { formatDateLongPtBr } from '@/lib/certificate-utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
@@ -171,6 +172,7 @@ export default function CertificadoPage() {
                             NOME_EVENTO: certificado.evento,
                             CARGA_HORARIA: Math.round(Number(certificado.cargaHoraria) || 0).toString(),
                             DATA: formatDate(certificado.metadados?.dataInicio || new Date(), 'dd/MM/yyyy'),
+                            DATA_EXTENSO: formatDateLongPtBr(certificado.metadados?.dataInicio || new Date()),
                             CODIGO_VALIDACAO: certificado.codigo
                         }}
                     />
@@ -195,6 +197,7 @@ export default function CertificadoPage() {
                                 NOME_EVENTO: certificado.evento,
                                 CARGA_HORARIA: Math.round(Number(certificado.cargaHoraria) || 0).toString(),
                                 DATA: formatDate(certificado.metadados?.dataInicio || new Date(), 'dd/MM/yyyy'),
+                                DATA_EXTENSO: formatDateLongPtBr(certificado.metadados?.dataInicio || new Date()),
                                 CODIGO_VALIDACAO: certificado.codigo
                             }}
                         />

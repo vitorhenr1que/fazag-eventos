@@ -11,16 +11,22 @@ import R2ImageUploader from './R2ImageUploader'
 import {
     Award, Eye, Settings2, Move, Type, Trash2,
     AlignCenter, AlignLeft, AlignRight,
-    Bold, Minus, Plus
+    Bold, Minus, Plus, ChevronDown, Image as ImageIcon, PenLine, Star, Save, Pencil
 } from 'lucide-react'
 import {
     CertificateTemplate,
     CertificateElement,
+    SavedCertificateTemplate,
     DEFAULT_TEMPLATE,
+    CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY,
+    CERTIFICATE_SAVED_TEMPLATES_STORAGE_KEY,
+    formatDateLongPtBr,
     renderMockText,
     clamp
 } from '@/lib/certificate-utils'
 import { cn } from '@/lib/utils'
+import { apiFetch } from '@/lib/api-client'
+import { toast } from 'sonner'
 
 interface CertificateEditorProps {
     config: {
@@ -39,6 +45,7 @@ const MOCK_DATA = {
     NOME_ALUNO: "João da Silva Sauro",
     NOME_EVENTO: "I Simpósio de Tecnologia Fazag",
     DATA: "14/02/2026",
+    DATA_EXTENSO: "14 de fevereiro de 2026",
     CARGA_HORARIA: "20"
 }
 
@@ -113,6 +120,10 @@ export default function CertificateEditor({
 
     const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
     const [canvasScale, setCanvasScale] = useState(1)
+    const [addMenuOpen, setAddMenuOpen] = useState(false)
+    const [templatesMenuOpen, setTemplatesMenuOpen] = useState(false)
+    const [savedTemplates, setSavedTemplates] = useState<SavedCertificateTemplate[]>([])
+    const [selectedTemplateId, setSelectedTemplateId] = useState('')
     const canvasRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -157,6 +168,20 @@ export default function CertificateEditor({
         return () => observer.disconnect()
     }, [template.page.width])
 
+    useEffect(() => {
+        const saved = localStorage.getItem(CERTIFICATE_SAVED_TEMPLATES_STORAGE_KEY)
+        if (!saved) return
+
+        try {
+            const parsed = JSON.parse(saved)
+            if (Array.isArray(parsed)) {
+                setSavedTemplates(parsed.filter((item) => item?.id && item?.name && item?.template?.elements))
+            }
+        } catch (err) {
+            console.error('Erro ao carregar templates salvos de certificado:', err)
+        }
+    }, [])
+
     const updateTemplate = (updates: Partial<CertificateTemplate>) => {
         const newTemplate = { ...template, ...updates }
         setTemplate(newTemplate)
@@ -181,7 +206,191 @@ export default function CertificateEditor({
         onChange({ ...config, template: newTemplate })
     }
 
-    const deleteElement = (id: string) => {
+    const getCurrentTemplatePayload = () => {
+        const currentTemplate = {
+            ...template,
+            background: {
+                ...template.background,
+                url: config.fundoUrl || template.background.url || ''
+            }
+        }
+
+        return {
+            fundoUrl: config.fundoUrl || currentTemplate.background.url || '',
+            template: currentTemplate,
+            ativo: config.ativo
+        }
+    }
+
+    const persistSavedTemplates = (templates: SavedCertificateTemplate[]) => {
+        setSavedTemplates(templates)
+        localStorage.setItem(CERTIFICATE_SAVED_TEMPLATES_STORAGE_KEY, JSON.stringify(templates))
+    }
+
+    const addTemplateFromCurrent = () => {
+        setTemplatesMenuOpen(false)
+        const name = window.prompt('Nome do template:', `Template ${savedTemplates.length + 1}`)
+        const trimmedName = name?.trim()
+
+        if (!trimmedName) return
+
+        const now = new Date().toISOString()
+        const payload = getCurrentTemplatePayload()
+        const id = `template-${Date.now()}`
+        const nextTemplate: SavedCertificateTemplate = {
+            id,
+            name: trimmedName,
+            ...payload,
+            createdAt: now,
+            updatedAt: now
+        }
+
+        const templates = [...savedTemplates, nextTemplate]
+        persistSavedTemplates(templates)
+        setSelectedTemplateId(id)
+        toast.success('Template de certificado salvo.')
+    }
+
+    const updateSelectedTemplate = () => {
+        setTemplatesMenuOpen(false)
+        const selectedTemplate = savedTemplates.find((item) => item.id === selectedTemplateId)
+
+        if (!selectedTemplate) {
+            toast.error('Selecione um template salvo.')
+            return
+        }
+
+        const payload = getCurrentTemplatePayload()
+        const templates = savedTemplates.map((item) =>
+            item.id === selectedTemplate.id
+                ? { ...item, ...payload, updatedAt: new Date().toISOString() }
+                : item
+        )
+
+        persistSavedTemplates(templates)
+        toast.success('Template atualizado.')
+    }
+
+    const renameSelectedTemplate = () => {
+        setTemplatesMenuOpen(false)
+        const selectedTemplate = savedTemplates.find((item) => item.id === selectedTemplateId)
+
+        if (!selectedTemplate) {
+            toast.error('Selecione um template salvo.')
+            return
+        }
+
+        const name = window.prompt('Novo nome do template:', selectedTemplate.name)
+        const trimmedName = name?.trim()
+
+        if (!trimmedName) return
+
+        const templates = savedTemplates.map((item) =>
+            item.id === selectedTemplate.id
+                ? { ...item, name: trimmedName, updatedAt: new Date().toISOString() }
+                : item
+        )
+
+        persistSavedTemplates(templates)
+        toast.success('Template renomeado.')
+    }
+
+    const deleteSelectedTemplate = () => {
+        setTemplatesMenuOpen(false)
+        const selectedTemplate = savedTemplates.find((item) => item.id === selectedTemplateId)
+
+        if (!selectedTemplate) {
+            toast.error('Selecione um template salvo.')
+            return
+        }
+
+        if (!window.confirm(`Excluir o template "${selectedTemplate.name}"?`)) return
+
+        const templates = savedTemplates.filter((item) => item.id !== selectedTemplate.id)
+        persistSavedTemplates(templates)
+        setSelectedTemplateId('')
+        toast.success('Template excluído.')
+    }
+
+    const applyTemplate = (templateId: string) => {
+        setTemplatesMenuOpen(false)
+        const selectedTemplate = savedTemplates.find((item) => item.id === templateId)
+
+        if (!selectedTemplate) {
+            toast.error('Selecione um template salvo.')
+            return
+        }
+
+        setTemplate(selectedTemplate.template)
+        onChange({
+            ...config,
+            fundoUrl: selectedTemplate.fundoUrl || selectedTemplate.template.background?.url || '',
+            template: selectedTemplate.template,
+            ativo: selectedTemplate.ativo
+        })
+        setSelectedElementId(null)
+        toast.success('Template aplicado ao certificado.')
+    }
+
+    const applySelectedTemplate = () => {
+        applyTemplate(selectedTemplateId)
+    }
+
+    const handleTemplateSelect = (templateId: string) => {
+        setSelectedTemplateId(templateId)
+        if (templateId) {
+            applyTemplate(templateId)
+        }
+    }
+
+    const saveAsDefaultTemplate = () => {
+        setTemplatesMenuOpen(false)
+        const selectedTemplate = savedTemplates.find((item) => item.id === selectedTemplateId)
+        const payload = selectedTemplate
+            ? {
+                fundoUrl: selectedTemplate.fundoUrl || selectedTemplate.template.background?.url || '',
+                template: selectedTemplate.template,
+                ativo: selectedTemplate.ativo
+            }
+            : getCurrentTemplatePayload()
+
+        localStorage.setItem(CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY, JSON.stringify(payload))
+
+        toast.success('Modelo padrão definido para novos eventos.')
+    }
+
+    const deleteR2CertificateElementImage = async (url?: string) => {
+        if (!url) return
+
+        const res = await apiFetch('/api/r2/object', {
+            method: 'DELETE',
+            body: JSON.stringify({
+                url,
+                eventoId,
+                kind: 'certificado_elemento'
+            }),
+            isAdmin: true
+        })
+
+        if (!res.ok) {
+            const err = await res.json()
+            throw new Error(err.error?.message || 'Erro ao excluir imagem do R2')
+        }
+    }
+
+    const deleteElement = async (id: string) => {
+        const element = template.elements.find(el => el.id === id)
+
+        if (element?.type === 'image' && element.src) {
+            try {
+                await deleteR2CertificateElementImage(element.src)
+            } catch (err: any) {
+                console.error(err)
+                toast.error(err.message || 'Erro ao excluir imagem do R2')
+                return
+            }
+        }
+
         const newElements = template.elements.filter(el => el.id !== id)
         const newTemplate = { ...template, elements: newElements }
         setTemplate(newTemplate)
@@ -190,6 +399,7 @@ export default function CertificateEditor({
     }
 
     const addNewText = () => {
+        setAddMenuOpen(false)
         const id = `text-${Date.now()}`
         const newElement: CertificateElement = {
             id,
@@ -206,6 +416,63 @@ export default function CertificateEditor({
                 color: '#000000',
                 align: 'left',
                 lineHeight: 1.2,
+                letterSpacing: 0
+            }
+        }
+        const newTemplate = { ...template, elements: [...template.elements, newElement] }
+        setTemplate(newTemplate)
+        onChange({ ...config, template: newTemplate })
+        setSelectedElementId(id)
+    }
+
+    const addNewImage = () => {
+        setAddMenuOpen(false)
+        const id = `image-${Date.now()}`
+        const newElement: CertificateElement = {
+            id,
+            type: 'image',
+            text: '',
+            src: '',
+            alt: 'Imagem do certificado',
+            objectFit: 'contain',
+            x: 0.35,
+            y: 0.35,
+            w: 0.3,
+            h: 0.2,
+            style: {
+                fontFamily: 'sans-serif',
+                fontSize: 16,
+                fontWeight: 400,
+                color: '#000000',
+                align: 'center',
+                lineHeight: 1,
+                letterSpacing: 0
+            }
+        }
+        const newTemplate = { ...template, elements: [...template.elements, newElement] }
+        setTemplate(newTemplate)
+        onChange({ ...config, template: newTemplate })
+        setSelectedElementId(id)
+    }
+
+    const addNewSignature = () => {
+        setAddMenuOpen(false)
+        const id = `signature-${Date.now()}`
+        const newElement: CertificateElement = {
+            id,
+            type: 'text',
+            text: '______________________________\nNome da Pessoa (Opcional)\nCargo (Opcional)',
+            x: 0.35,
+            y: 0.7,
+            w: 0.3,
+            h: 0.12,
+            style: {
+                fontFamily: 'sans-serif',
+                fontSize: 18,
+                fontWeight: 400,
+                color: '#000000',
+                align: 'center',
+                lineHeight: 1.45,
                 letterSpacing: 0
             }
         }
@@ -299,10 +566,127 @@ export default function CertificateEditor({
                         <Award className="text-primary" size={24} />
                         <h3 className="font-bold text-lg text-slate-800">Editor Visual de Certificado</h3>
                     </div>
-                    <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={addNewText} className="shadow-sm">
-                            <Plus size={16} className="mr-1" /> Add Texto
+                    <div className="relative flex gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAddMenuOpen((open) => !open)}
+                            className="shadow-sm"
+                        >
+                            <Plus size={16} className="mr-1" />
+                            Adicionar
+                            <ChevronDown size={14} className="ml-1" />
                         </Button>
+                        {addMenuOpen && (
+                            <div className="absolute right-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={addNewText}
+                                >
+                                    <Type size={15} />
+                                    Adicionar texto
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={addNewImage}
+                                >
+                                    <ImageIcon size={15} />
+                                    Adicionar imagem
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={addNewSignature}
+                                >
+                                    <PenLine size={15} />
+                                    Adicionar assinatura
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 md:flex-row md:items-center">
+                    <select
+                        className="h-9 min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                        value={selectedTemplateId}
+                        onChange={(e) => handleTemplateSelect(e.target.value)}
+                    >
+                        <option value="">Templates salvos</option>
+                        {savedTemplates.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                        ))}
+                    </select>
+                    <div className="relative">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setTemplatesMenuOpen((open) => !open)}
+                            className="w-full justify-center bg-white md:w-auto"
+                        >
+                            Templates
+                            <ChevronDown size={14} className="ml-1" />
+                        </Button>
+                        {templatesMenuOpen && (
+                            <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={applySelectedTemplate}
+                                    disabled={!selectedTemplateId}
+                                >
+                                    <Eye size={15} />
+                                    Aplicar selecionado
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={addTemplateFromCurrent}
+                                >
+                                    <Plus size={15} />
+                                    Adicionar template
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={updateSelectedTemplate}
+                                    disabled={!selectedTemplateId}
+                                >
+                                    <Save size={15} />
+                                    Atualizar selecionado
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={renameSelectedTemplate}
+                                    disabled={!selectedTemplateId}
+                                >
+                                    <Pencil size={15} />
+                                    Renomear template
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={saveAsDefaultTemplate}
+                                >
+                                    <Star size={15} />
+                                    Padrão novos eventos
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={deleteSelectedTemplate}
+                                    disabled={!selectedTemplateId}
+                                >
+                                    <Trash2 size={15} />
+                                    Excluir template
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -358,29 +742,48 @@ export default function CertificateEditor({
                                 }}
                                 onPointerDown={(e) => onPointerDown(e, el, 'move')}
                             >
-                                <div
-                                    className="w-full h-full overflow-hidden"
-                                    style={{
-                                        fontFamily: el.style.fontFamily,
-                                        fontSize: el.style.fontSize * canvasScale,
-                                        fontWeight: el.style.fontWeight,
-                                        color: el.style.color,
-                                        textAlign: el.style.align,
-                                        lineHeight: el.style.lineHeight,
-                                        letterSpacing: el.style.letterSpacing * canvasScale,
-                                        whiteSpace: 'pre-wrap',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: el.style.align === 'center' ? 'center' : el.style.align === 'right' ? 'flex-end' : 'flex-start'
-                                    }}
-                                >
-                                    {renderMockText(el.text, {
-                                        ...MOCK_DATA,
-                                        NOME_EVENTO: eventoNome || MOCK_DATA.NOME_EVENTO,
-                                        CARGA_HORARIA: cargaHoraria?.toString() || MOCK_DATA.CARGA_HORARIA,
-                                        DATA: dataInicio ? new Date(dataInicio).toLocaleDateString('pt-BR') : MOCK_DATA.DATA
-                                    })}
-                                </div>
+                                {el.type === 'image' ? (
+                                    <div className="flex h-full w-full items-center justify-center overflow-hidden">
+                                        {el.src ? (
+                                            <img
+                                                src={el.src}
+                                                alt={el.alt || 'Imagem do certificado'}
+                                                className="h-full w-full"
+                                                style={{ objectFit: el.objectFit || 'contain' }}
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-slate-300 text-slate-400">
+                                                <ImageIcon size={Math.max(16, 28 * canvasScale)} />
+                                                <span className="text-[10px]">Imagem</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div
+                                        className="w-full h-full overflow-hidden"
+                                        style={{
+                                            fontFamily: el.style.fontFamily,
+                                            fontSize: el.style.fontSize * canvasScale,
+                                            fontWeight: el.style.fontWeight,
+                                            color: el.style.color,
+                                            textAlign: el.style.align,
+                                            lineHeight: el.style.lineHeight,
+                                            letterSpacing: el.style.letterSpacing * canvasScale,
+                                            whiteSpace: 'pre-wrap',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: el.style.align === 'center' ? 'center' : el.style.align === 'right' ? 'flex-end' : 'flex-start'
+                                        }}
+                                    >
+                                        {renderMockText(el.text, {
+                                            ...MOCK_DATA,
+                                            NOME_EVENTO: eventoNome || MOCK_DATA.NOME_EVENTO,
+                                            CARGA_HORARIA: cargaHoraria?.toString() || MOCK_DATA.CARGA_HORARIA,
+                                            DATA: dataInicio ? new Date(dataInicio).toLocaleDateString('pt-BR') : MOCK_DATA.DATA,
+                                            DATA_EXTENSO: dataInicio ? formatDateLongPtBr(dataInicio) : MOCK_DATA.DATA_EXTENSO
+                                        })}
+                                    </div>
+                                )}
 
                                 {/* Resize Handles */}
                                 {isSelected && (
@@ -476,6 +879,43 @@ export default function CertificateEditor({
                                     </Button>
                                 </div>
 
+                                {selectedElement.type === 'image' ? (
+                                    <div className="space-y-4">
+                                        <R2ImageUploader
+                                            label="Imagem do Elemento"
+                                            currentUrl={selectedElement.src}
+                                            kind="certificado_elemento"
+                                            eventoId={eventoId}
+                                            aspectRatio="aspect-[3/2]"
+                                            idealSize="600x400"
+                                            deleteRemoteOnRemove
+                                            onUploadSuccess={(url) => updateElement(selectedElement.id, { src: url || '' })}
+                                        />
+
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[11px]">Ajuste</Label>
+                                            <select
+                                                className="w-full text-xs p-1.5 border rounded"
+                                                value={selectedElement.objectFit || 'contain'}
+                                                onChange={(e) => updateElement(selectedElement.id, { objectFit: e.target.value as CertificateElement['objectFit'] })}
+                                            >
+                                                <option value="contain">Conter</option>
+                                                <option value="cover">Preencher</option>
+                                                <option value="fill">Esticar</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[11px]">Texto alternativo</Label>
+                                            <Input
+                                                className="h-8 text-xs"
+                                                value={selectedElement.alt || ''}
+                                                onChange={(e) => updateElement(selectedElement.id, { alt: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
                                 <div className="space-y-2">
                                     <Label className="text-[11px]">Texto do Elemento</Label>
                                     <Textarea
@@ -484,7 +924,7 @@ export default function CertificateEditor({
                                         onChange={(e) => updateElement(selectedElement.id, { text: e.target.value })}
                                         placeholder="Use {{NOME_ALUNO}}, etc."
                                     />
-                                    <p className="text-[9px] text-slate-400">Variáveis: {'{{NOME_ALUNO}}'}, {'{{NOME_EVENTO}}'}, {'{{DATA}}'}, {'{{CARGA_HORARIA}}'}</p>
+                                    <p className="text-[9px] text-slate-400">Variáveis: {'{{NOME_ALUNO}}'}, {'{{NOME_EVENTO}}'}, {'{{DATA}}'}, {'{{DATA_EXTENSO}}'}, {'{{CARGA_HORARIA}}'}</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
@@ -598,6 +1038,9 @@ export default function CertificateEditor({
                                         />
                                     </div>
                                 </div>
+
+                                    </>
+                                )}
 
                                 <div className="pt-2 border-t text-[10px] text-slate-400 space-y-1">
                                     <div className="flex justify-between">

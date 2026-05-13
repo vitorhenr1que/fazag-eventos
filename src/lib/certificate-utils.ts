@@ -10,8 +10,11 @@ export interface ElementStyle {
 
 export interface CertificateElement {
     id: string;
-    type: 'text';
+    type: 'text' | 'image';
     text: string;
+    src?: string;
+    alt?: string;
+    objectFit?: 'cover' | 'contain' | 'fill';
     x: number; // normalized 0..1
     y: number; // normalized 0..1
     w: number; // normalized 0..1
@@ -31,6 +34,19 @@ export interface CertificateTemplate {
     };
     elements: CertificateElement[];
 }
+
+export interface SavedCertificateTemplate {
+    id: string;
+    name: string;
+    fundoUrl?: string;
+    template: CertificateTemplate;
+    ativo: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export const CERTIFICATE_DEFAULT_TEMPLATE_STORAGE_KEY = 'fazag-eventos:certificate-default-template';
+export const CERTIFICATE_SAVED_TEMPLATES_STORAGE_KEY = 'fazag-eventos:certificate-saved-templates';
 
 export const DEFAULT_TEMPLATE: CertificateTemplate = {
     page: { width: 1200, height: 850, unit: 'px' },
@@ -88,6 +104,18 @@ export function denormalize(value: number, total: number): number {
 
 export function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
+}
+
+export function formatDateLongPtBr(date: string | Date | number): string {
+    const parsedDate = new Date(date);
+
+    if (isNaN(parsedDate.getTime())) return '';
+
+    return new Intl.DateTimeFormat('pt-BR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    }).format(parsedDate);
 }
 
 export function renderMockText(text: string, mockData: Record<string, string>): string {

@@ -36,7 +36,11 @@ export async function POST(request: NextRequest) {
         const id = eventoId || `temp-${timestamp}`;
 
         // Definir prefixo da Key baseado no kind
-        const prefix = kind === 'certificado_fundo' ? 'certificado-fundo' : 'banner';
+        const prefix = kind === 'certificado_fundo'
+            ? 'certificado-fundo'
+            : kind === 'certificado_elemento'
+                ? 'certificado-elemento'
+                : 'banner';
         const key = `eventos/${id}/${prefix}-${timestamp}.${ext}`;
 
         // 4. Gerar Presigned URL

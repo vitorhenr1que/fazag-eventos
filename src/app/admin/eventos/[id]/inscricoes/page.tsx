@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft, CheckCircle, CreditCard, Check, FileText, Download } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle, CreditCard, Check, FileText, Download, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -132,6 +132,31 @@ export default function InscricoesEventoPage() {
             }
         } catch (err) {
             toast.error('Erro ao emitir certificado')
+        } finally {
+            setEmittingId(null)
+        }
+    }
+
+    async function handleExcluirCertificado(inscricaoId: string) {
+        const confirmar = confirm('Tem certeza que deseja excluir o certificado deste inscrito? O aluno poderá gerar um novo certificado se cumprir os requisitos.')
+        if (!confirmar) return
+
+        setEmittingId(inscricaoId)
+        try {
+            const res = await apiFetch(`/api/admin/inscricoes/${inscricaoId}/certificado`, {
+                method: 'DELETE',
+                isAdmin: true
+            })
+
+            if (res.ok) {
+                toast.success('Certificado excluído com sucesso!')
+                setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, certificado: null } : i))
+            } else {
+                const json = await res.json()
+                toast.error(json.error?.message || 'Erro ao excluir certificado')
+            }
+        } catch (err) {
+            toast.error('Erro ao excluir certificado')
         } finally {
             setEmittingId(null)
         }
@@ -552,6 +577,14 @@ export default function InscricoesEventoPage() {
                                                                 disabled={emittingId === insc.id}
                                                             >
                                                                 Editar Carga
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleExcluirCertificado(insc.id)}
+                                                                className="inline-flex items-center gap-1 text-[10px] text-red-600 hover:underline disabled:opacity-50"
+                                                                disabled={emittingId === insc.id}
+                                                            >
+                                                                {emittingId === insc.id ? <Loader2 className="animate-spin" size={10} /> : <Trash2 size={10} />}
+                                                                Excluir
                                                             </button>
                                                         </>
                                                     ) : (

@@ -16,6 +16,7 @@ interface CertificateRendererProps {
         NOME_EVENTO: string
         CARGA_HORARIA: string
         DATA: string
+        DATA_EXTENSO?: string
         CODIGO_VALIDACAO?: string
         [key: string]: string | undefined
     }
@@ -112,6 +113,33 @@ export default function CertificateRenderer({ template: rawTemplate, data, width
 
                 {/* Elements */}
                 {template.elements.map((el) => {
+                    if (el.type === 'image') {
+                        return (
+                            <div
+                                key={el.id}
+                                className="absolute pointer-events-none select-none overflow-hidden flex items-center justify-center"
+                                style={{
+                                    left: el.x * template.page.width,
+                                    top: el.y * template.page.height,
+                                    width: el.w * template.page.width,
+                                    height: el.h * template.page.height,
+                                }}
+                            >
+                                {el.src && (
+                                    <img
+                                        src={el.src}
+                                        alt={el.alt || 'Imagem do certificado'}
+                                        loading="eager"
+                                        className="h-full w-full"
+                                        style={{
+                                            objectFit: el.objectFit || 'contain'
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        )
+                    }
+
                     return (
                         <div
                             key={el.id}
