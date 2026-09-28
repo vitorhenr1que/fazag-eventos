@@ -52,6 +52,8 @@ export default function TeaserPage() {
                 <div className={styles.wave} />
             </div>
 
+            <p className={styles.eyebrow}>vem aí...</p>
+
             <h1 className={styles.title} aria-label="A maior de todos os tempos">
                 {lines.map((line, lineIndex) => (
                     <span className={`${styles.line} ${styles[`line${lineIndex + 1}`]}`} key={lineIndex}>
