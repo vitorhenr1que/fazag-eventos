@@ -6,6 +6,9 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { LayoutDashboard, Calendar, LogOut, CreditCard, Tags } from 'lucide-react'
 import { Toaster } from 'sonner'
+import { apiFetch } from '@/lib/api-client'
+import { adminHome, adminRoleLabels, canAccessAdminPage, type AdminSession } from '@/lib/admin-permissions'
+import { AdminSessionContext } from '@/components/admin/AdminSessionContext'
 
 export default function AdminLayout({
     children,
@@ -14,18 +17,32 @@ export default function AdminLayout({
 }) {
     const router = useRouter()
     const pathname = usePathname()
-    const [authorized, setAuthorized] = React.useState(false)
+    const [session, setSession] = React.useState<AdminSession | null>(null)
+    const [verifiedPath, setVerifiedPath] = React.useState('')
+    const [error, setError] = React.useState('')
+    const [retry, setRetry] = React.useState(0)
 
     useEffect(() => {
-        const token = localStorage.getItem('admin-token')
-        const isLoginPage = pathname === '/admin/login'
-
-        if (!token && !isLoginPage) {
-            router.push('/admin/login')
-        } else {
-            setAuthorized(true)
+        let active = true
+        setVerifiedPath(''); setError('')
+        if (pathname === '/admin/login') { setSession(null); return }
+        if (!localStorage.getItem('admin-token')) { router.replace('/admin/login'); return }
+        async function verify() {
+            try {
+                const res = await apiFetch('/api/admin/auth/me', { isAdmin: true })
+                const json = await res.json()
+                if (!active) return
+                if (res.status === 401) { localStorage.removeItem('admin-token'); router.replace('/admin/login'); return }
+                if (!res.ok) throw new Error(json.error?.message || 'Não foi possível verificar seu acesso')
+                const profile: AdminSession = json.data
+                setSession(profile)
+                if (!canAccessAdminPage(profile.role, pathname)) { router.replace(adminHome(profile.role)); return }
+                setVerifiedPath(pathname)
+            } catch (err) { if (active) setError(err instanceof Error ? err.message : 'Erro de conexão') }
         }
-    }, [router, pathname])
+        verify()
+        return () => { active = false }
+    }, [router, pathname, retry])
 
     // Se for a página de login, renderiza apenas o conteúdo (sem sidebar)
     if (pathname === '/admin/login') {
@@ -37,7 +54,8 @@ export default function AdminLayout({
         )
     }
 
-    if (!authorized) return null
+    if (error) return <div className="p-8 space-y-4"><p role="alert">{error}</p><Button onClick={() => setRetry(r => r + 1)}>Tentar novamente</Button></div>
+    if (!session || verifiedPath !== pathname || !canAccessAdminPage(session.role, pathname)) return <p role="status" className="p-8 text-slate-500">Verificando acesso...</p>
 
     const handleLogout = () => {
         localStorage.removeItem('admin-token')
@@ -45,6 +63,7 @@ export default function AdminLayout({
     }
 
     return (
+        <AdminSessionContext.Provider value={session}>
         <div className="flex min-h-screen bg-slate-100">
             {/* Sidebar */}
             <aside className="w-64 bg-slate-900 text-white flex flex-col">
@@ -52,18 +71,17 @@ export default function AdminLayout({
                     Admin FAZAG
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
-                    <Link href="/admin/dashboard" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/dashboard' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
-                        <LayoutDashboard size={20} /> Dashboard
-                    </Link>
-                    <Link href="/admin/eventos" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/eventos' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
-                        <Calendar size={20} /> Eventos
-                    </Link>
-                    <Link href="/admin/tipos-atividade" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/tipos-atividade' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
-                        <Tags size={20} /> Tipos de Atividade
-                    </Link>
-                    <Link href="/admin/inscricoes/pendentes" className={`flex items-center gap-3 p-2 rounded transition ${pathname === '/admin/inscricoes/pendentes' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
-                        <CreditCard size={20} /> Pendentes
-                    </Link>
+                    {[
+                        { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                        { href: '/admin/eventos', label: 'Eventos', icon: Calendar },
+                        { href: '/admin/tipos-atividade', label: 'Tipos de Atividade', icon: Tags },
+                        { href: '/admin/inscricoes/pendentes', label: 'Pendentes', icon: CreditCard },
+                        { href: '/admin/financeiro', label: 'Financeiro', icon: CreditCard },
+                    ].filter(item => canAccessAdminPage(session.role, item.href)).map(({ href, label, icon: Icon }) => (
+                        <Link key={href} href={href} className={`flex items-center gap-3 p-2 rounded transition ${pathname === href ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
+                            <Icon size={20} /> {label}
+                        </Link>
+                    ))}
                 </nav>
                 <div className="p-4 border-t border-slate-800">
                     <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white" onClick={handleLogout}>
@@ -77,7 +95,7 @@ export default function AdminLayout({
                 <header className="h-16 bg-white border-b flex items-center px-8 justify-between shadow-sm">
                     <h2 className="font-semibold text-slate-700">Painel de Controle</h2>
                     <div className="flex items-center gap-4">
-                        <span className="text-sm text-slate-500 italic">Administrador</span>
+                        <span className="text-sm text-slate-500">{session.nome} · {adminRoleLabels[session.role]}</span>
                     </div>
                 </header>
                 <div className="p-8">
@@ -86,5 +104,6 @@ export default function AdminLayout({
             </main>
             <Toaster richColors />
         </div>
+        </AdminSessionContext.Provider>
     )
 }

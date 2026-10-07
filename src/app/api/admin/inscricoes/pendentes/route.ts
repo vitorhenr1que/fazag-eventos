@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { handleApiError } from '@/lib/app-error'
+import { getAdminFromHeader } from '@/lib/auth-admin'
 
 export async function GET(request: NextRequest) {
     try {
+        await getAdminFromHeader(request, 'FINANCEIRO')
         const pendentes = await prisma.inscricao.findMany({
             where: {
                 status: 'PENDENTE',
-                evento: {
-                    tipo: 'PAGO'
-                }
             },
             include: {
                 aluno: true,

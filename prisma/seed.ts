@@ -7,18 +7,18 @@ const prisma = new PrismaClient()
 async function main() {
     console.log('🌱 Iniciando seed...')
 
-    // 1. Criar Admin
+    // 1. Criar NUPPEX
     const adminEmail = 'nuppex@fazag.edu.br'
     const adminSenha = await bcrypt.hash('fazagfaz1', 10)
 
     const admin = await prisma.admin.upsert({
         where: { email: adminEmail },
-        update: {},
+        update: { role: 'NUPPEX' },
         create: {
             email: adminEmail,
-            nome: 'Administrador Principal',
+            nome: 'Nuppex Fazag',
             senha: adminSenha,
-            role: 'SUPER_ADMIN'
+            role: 'NUPPEX'
         }
     })
     console.log(`👤 Admin criado: ${admin.email}`)

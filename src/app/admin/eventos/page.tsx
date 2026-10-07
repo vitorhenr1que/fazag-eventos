@@ -9,8 +9,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAdminSession } from '@/components/admin/AdminSessionContext'
+import { hasAdminPermission } from '@/lib/admin-permissions'
 
 export default function AdminEventosPage() {
+    const session = useAdminSession()
     const [eventos, setEventos] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -109,6 +112,11 @@ export default function AdminEventosPage() {
                                                 <Users size={16} />
                                             </Link>
                                         </Button>
+                                        {e.tipo === 'PAGO' && hasAdminPermission(session.role, 'FINANCEIRO') && <Button size="sm" variant="outline" asChild>
+                                            <Link href={`/admin/financeiro?eventoId=${e.id}`}>
+                                                Financeiro
+                                            </Link>
+                                        </Button>}
                                         <Button variant="ghost" size="sm" asChild title="Editar Evento">
                                             <Link href={`/admin/eventos/${e.id}/editar`}>
                                                 <Edit2 size={16} />

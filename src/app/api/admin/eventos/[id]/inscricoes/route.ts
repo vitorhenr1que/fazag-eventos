@@ -1,12 +1,15 @@
+import { getAdminFromHeader } from '@/lib/auth-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { handleApiError } from '@/lib/app-error'
+import { hasAdminPermission } from '@/lib/admin-permissions'
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const admin = await getAdminFromHeader(request)
         const { id } = await params
         const inscricoes = await prisma.inscricao.findMany({
             where: { eventoId: id },
@@ -23,7 +26,11 @@ export async function GET(
             } as any
         })
 
-        return NextResponse.json({ success: true, count: inscricoes.length, data: inscricoes })
+        const data = hasAdminPermission(admin.role, 'FINANCEIRO') ? inscricoes : inscricoes.map(inscricao => {
+            const { valorReferencia, valorPago, valorDesconto, situacaoFinanceira, dataPagamento, aprovadoPor, observacaoFinanceira, ...operacional } = inscricao
+            return operacional
+        })
+        return NextResponse.json({ success: true, count: inscricoes.length, data })
     } catch (error) {
         return handleApiError(error)
     }

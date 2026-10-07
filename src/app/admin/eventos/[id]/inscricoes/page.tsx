@@ -10,8 +10,11 @@ import { Loader2, ArrowLeft, CheckCircle, CreditCard, Check, FileText, Download,
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAdminSession } from '@/components/admin/AdminSessionContext'
+import { hasAdminPermission } from '@/lib/admin-permissions'
 
 export default function InscricoesEventoPage() {
+    const session = useAdminSession()
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
     const [inscricoes, setInscricoes] = useState<any[]>([])
@@ -605,7 +608,7 @@ export default function InscricoesEventoPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right space-x-2">
-                                                {insc.status === 'PENDENTE' && (
+                                                {insc.status === 'PENDENTE' && hasAdminPermission(session.role, 'FINANCEIRO') && (
                                                     <Button size="sm" variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50 h-8 text-[11px]" onClick={() => handleAprovarPagamento(insc.id)}>
                                                         Aprovar
                                                     </Button>

@@ -26,7 +26,7 @@ export async function GET(
             }
         })
 
-        if (!certificado || !certificado.inscricao) {
+        if (!certificado || !certificado.inscricao || certificado.inscricao.status !== 'CONFIRMADA') {
             return NextResponse.json(
                 { success: false, error: 'Certificado inválido ou não encontrado' },
                 {

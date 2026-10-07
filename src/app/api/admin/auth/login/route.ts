@@ -5,7 +5,7 @@ import { handleApiError, AppError } from '@/lib/app-error'
 import { z } from 'zod'
 
 const loginSchema = z.object({
-    email: z.string().email(),
+    email: z.string().trim().toLowerCase().email(),
     senha: z.string().min(6),
 })
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
         const token = adminAuth.signToken({ id: admin.id, role: admin.role })
 
-        return NextResponse.json({ success: true, token })
+        return NextResponse.json({ success: true, token, admin: { id: admin.id, nome: admin.nome, email: admin.email, role: admin.role } })
     } catch (error) {
         return handleApiError(error)
     }

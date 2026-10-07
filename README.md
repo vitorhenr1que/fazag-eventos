@@ -128,6 +128,70 @@ x-aluno-id: ADM200026
 ---
 Desenvolvido com Next.js 14+ (App Router), Prisma e Tailwind CSS.
 
+## Relatório financeiro
+
+### Perfis administrativos
+
+| Perfil | Acesso |
+| --- | --- |
+| ADMIN / SUPER_ADMIN | Todas as áreas administrativas |
+| NUPPEX | Dashboard, eventos, inscrições, presença, certificados e tipos de atividade; sem ações financeiras |
+| FINANCEIRO | Apenas Pendentes e Financeiro, incluindo aprovação, desconto, isenção, cancelamento de pagamento e registro de reembolso |
+
+O login direciona o FINANCEIRO para Pendentes. A navegação mostra somente as áreas permitidas,
+e todas as APIs administrativas verificam o perfil atual no banco; alterações de perfil valem também
+para tokens emitidos anteriormente. O botão Financeiro na lista de eventos aparece somente em
+eventos pagos e para quem tem acesso financeiro. Senhas dos usuários são armazenadas como hashes bcrypt.
+
+O painel `/admin/financeiro` permite selecionar um evento, consultar quantidades de inscritos,
+confirmados, pagos, pagos com desconto, isentos, gratuitos e pendentes, além de exportar CSV.
+O total arrecadado soma somente os recebimentos registrados. O detalhamento inclui aluno,
+valor de referência, valor recebido, desconto ou isenção, data, administrador e observação.
+Os filtros afetam o detalhamento e sua exportação; os indicadores sempre representam o evento inteiro.
+
+Em `/admin/inscricoes/pendentes`:
+
+- **Aprovar** confirma o pagamento integral do valor de referência da inscrição.
+- **Desconto** permite informar o valor efetivamente recebido e confirmar o pagamento.
+- **Isenção** confirma sem recebimento e registra o valor dispensado.
+
+Novas inscrições preservam o preço vigente na inscrição. Mudanças posteriores no preço do evento
+não alteram esses valores nem os pagamentos já aprovados. Pendências anteriores à atualização,
+sem referência histórica, usam o preço vigente na aprovação. Aprovações anteriores sem registro
+financeiro aparecem explicitamente como **Sem registro financeiro** e não são estimadas como receita.
+O valor a receber é uma estimativa antes de eventuais descontos ou isenções; para pendências
+antigas sem valor registrado, essa estimativa usa o preço atual do evento.
+
+Para instalar em um banco com histórico de migrações atualizado:
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
+```
+
+A migração `20261007120000_financeiro_inscricoes` somente adiciona campos opcionais,
+sem preencher valores financeiros antigos. Se o banco tiver sido mantido com `prisma db push`,
+confira as migrações já refletidas na estrutura antes de usar `migrate deploy`; uma migração
+efetivamente aplicada pode ser registrada no histórico com `prisma migrate resolve --applied`.
+Não marque como aplicada uma migração cuja estrutura ainda não existe.
+
+Para validar cálculos financeiros e exportação:
+
+```bash
+node --test tests/*.test.cjs
+```
+
+No detalhamento do relatório, **Cancelar pagamento** limpa o pagamento ou isenção, mantém o valor
+de referência e devolve a inscrição a Pendentes. Essa ação não é contabilizada como reembolso.
+**Reembolsar** registra a devolução integral do valor recebido e exclui a inscrição e seus vínculos
+(atividades escolhidas, presenças e certificado). O cadastro do aluno permanece.
+O histórico de reembolsos é independente da inscrição e preserva nome, valor original, data,
+administrador responsável e motivo. Pagamentos antigos exigem a informação explícita do valor recebido.
+O relatório mostra arrecadação bruta, devoluções e saldo após reembolsos. Não há integração com um
+processador de pagamentos: a ação registra uma devolução realizada pelo administrador.
+Se a exclusão for interrompida, use **Concluir reembolso** no histórico para retomar a operação
+sem duplicar a devolução. Isso também funciona nas tabelas MyISAM do banco existente.
+
 ## ☁️ Configuração Cloudflare R2 (CORS)
 
 Para permitir o upload direto de banners do navegador para o R2, você deve configurar o CORS no bucket `fazag-eventos`:

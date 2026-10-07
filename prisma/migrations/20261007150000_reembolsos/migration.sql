@@ -1,0 +1,23 @@
+CREATE TABLE `reembolsos` (
+    `id` VARCHAR(25) NOT NULL,
+    `inscricaoOriginalId` VARCHAR(25) NOT NULL,
+    `eventoId` VARCHAR(25) NOT NULL,
+    `alunoId` VARCHAR(36) NOT NULL,
+    `alunoNome` VARCHAR(120) NOT NULL,
+    `alunoEmail` VARCHAR(190) NULL,
+    `valorReferencia` DECIMAL(10, 2) NULL,
+    `valorPago` DECIMAL(10, 2) NOT NULL,
+    `valorDesconto` DECIMAL(10, 2) NULL,
+    `modalidadeOriginal` VARCHAR(20) NOT NULL,
+    `dataInscricao` DATETIME(3) NOT NULL,
+    `dataPagamento` DATETIME(3) NULL,
+    `aprovadoPor` VARCHAR(25) NULL,
+    `observacaoPagamento` VARCHAR(500) NULL,
+    `estado` VARCHAR(20) NOT NULL DEFAULT 'PROCESSANDO',
+    `dataReembolso` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `reembolsadoPor` VARCHAR(25) NOT NULL,
+    `motivo` VARCHAR(500) NULL,
+    UNIQUE INDEX `reembolsos_inscricaoOriginalId_key` (`inscricaoOriginalId`),
+    INDEX `reembolsos_eventoId_estado_idx` (`eventoId`, `estado`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

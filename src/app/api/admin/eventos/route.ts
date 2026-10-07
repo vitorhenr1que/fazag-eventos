@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     try {
+        await getAdminFromHeader(request)
         const eventos = await prisma.evento.findMany({
             orderBy: { dataInicio: 'desc' },
             include: {

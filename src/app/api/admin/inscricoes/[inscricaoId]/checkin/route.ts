@@ -1,3 +1,4 @@
+import { getAdminFromHeader } from '@/lib/auth-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { InscricaoService } from '@/services/inscricao.service'
 import { handleApiError } from '@/lib/app-error'
@@ -9,6 +10,7 @@ export async function POST(
     { params }: { params: Promise<{ inscricaoId: string }> }
 ) {
     try {
+        await getAdminFromHeader(request)
         const { inscricaoId } = await params
         // Admin fazendo check-in manual para um aluno
         // Pode passar query param ?tipo=EVENTO ou body

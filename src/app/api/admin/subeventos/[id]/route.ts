@@ -1,3 +1,4 @@
+import { getAdminFromHeader } from '@/lib/auth-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { handleApiError } from '@/lib/app-error'
@@ -10,6 +11,7 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        await getAdminFromHeader(request)
         const { id } = await params
         const body = await request.json()
 
@@ -26,6 +28,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        await getAdminFromHeader(request)
         const { id } = await params
         await prisma.subevento.delete({
             where: { id }

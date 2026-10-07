@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner' // Ensure toaster is in RootLayout
+import { adminHome } from '@/lib/admin-permissions'
 
 export default function AdminLoginPage() {
     const router = useRouter()
@@ -27,7 +28,7 @@ export default function AdminLoginPage() {
             if (res.ok) {
                 localStorage.setItem('admin-token', json.token)
                 toast.success('Login realizado com sucesso')
-                router.push('/admin/dashboard')
+                router.replace(adminHome(json.admin.role))
             } else {
                 toast.error(json.error?.message || 'Credenciais inválidas')
             }
