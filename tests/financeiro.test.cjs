@@ -49,7 +49,8 @@ test('relatório separa pagos, descontos, isentos, gratuitos e histórico descon
     ], 50)
     assert.deepEqual(resumo, { inscritos: 7, confirmados: 5, pagos: 2, comDesconto: 1, isentos: 1,
         gratuitos: 1, pendentes: 2, semRegistro: 1, recebido: 50, descontos: 10, isencoes: 30, aReceber: 80, pendentesSemValor: 1,
-        reembolsado: 0, saldo: 50, qtdReembolsos: 0, reembolsosEmProcessamento: 0 })
+        reembolsado: 0, saldo: 50, qtdReembolsos: 0, reembolsosEmProcessamento: 0,
+        valorMantido: 0, pagamentosMantidos: 0, mantidosSemValor: 0 })
 })
 
 test('somar valores decimais não acumula erros de ponto flutuante', () => {
@@ -110,4 +111,19 @@ test('reembolso parcial em processamento não duplica receita nem contabiliza de
 test('ações financeiras rejeitam operações desconhecidas', () => {
     assert.equal(acaoFinanceiraSchema.safeParse({ acao: 'EXCLUIR' }).success, false)
     assert.equal(acaoFinanceiraSchema.safeParse({ acao: 'REEMBOLSO', valorHistorico: -30 }).success, false)
+})
+
+test('recebimento mantido soma valor original sem contar inscrição ou gerar reembolso', () => {
+    const resumo = resumirFinanceiro([], 90, [], [
+        { valorPago: '20.10', valorReferencia: '30.00', situacaoFinanceira: 'DESCONTO' },
+        { valorPago: null, situacaoFinanceira: null },
+    ])
+    assert.equal(resumo.inscritos, 0)
+    assert.equal(resumo.pagos, 0)
+    assert.equal(resumo.recebido, 20.1)
+    assert.equal(resumo.saldo, 20.1)
+    assert.equal(resumo.reembolsado, 0)
+    assert.equal(resumo.valorMantido, 20.1)
+    assert.equal(resumo.pagamentosMantidos, 2)
+    assert.equal(resumo.mantidosSemValor, 1)
 })

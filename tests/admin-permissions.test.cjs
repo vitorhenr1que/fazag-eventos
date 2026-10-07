@@ -26,9 +26,15 @@ test('NUPPEX mantém gestão e não acessa funcionalidades financeiras', () => {
 
 test('administradores têm acesso a todas as áreas; perfis desconhecidos não têm acesso', () => {
     for (const role of ['ADMIN', 'SUPER_ADMIN']) {
-        for (const permission of ['GESTAO', 'FINANCEIRO', 'SESSAO']) assert.equal(hasAdminPermission(role, permission), true)
+        for (const permission of ['GESTAO', 'FINANCEIRO', 'SESSAO', 'ADMINISTRADOR']) assert.equal(hasAdminPermission(role, permission), true)
     }
     for (const permission of ['GESTAO', 'FINANCEIRO', 'SESSAO']) assert.equal(hasAdminPermission('ALUNO', permission), false)
+})
+
+test('excluir inscrição pela lista de inscritos é privilégio exclusivo do administrador', () => {
+    for (const role of ['FINANCEIRO', 'NUPPEX', 'ALUNO']) assert.equal(hasAdminPermission(role, 'ADMINISTRADOR'), false)
+    const route = fs.readFileSync(path.resolve(__dirname, '../src/app/api/admin/inscricoes/[inscricaoId]/excluir/route.ts'), 'utf8')
+    assert.match(route, /getAdminFromHeader\(request, 'ADMINISTRADOR'\)/)
 })
 
 test('todas as rotas administrativas protegidas validam o perfil no servidor', () => {

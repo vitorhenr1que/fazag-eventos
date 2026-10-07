@@ -192,6 +192,16 @@ processador de pagamentos: a ação registra uma devolução realizada pelo admi
 Se a exclusão for interrompida, use **Concluir reembolso** no histórico para retomar a operação
 sem duplicar a devolução. Isso também funciona nas tabelas MyISAM do banco existente.
 
+Na lista `/admin/eventos/[id]/inscricoes`, somente o **ADMINISTRADOR** pode usar
+**Excluir inscrição**. Eventos pagos exigem escolher entre registrar reembolso,
+excluir inscrição e pagamento sem reembolso, ou excluir somente a inscrição mantendo o pagamento.
+Eventos gratuitos possuem confirmação simples. Pendentes não possuem pagamento para manter ou reembolsar;
+isenções não geram reembolso. Todas as opções excluem os vínculos da inscrição, sem excluir o cadastro do aluno.
+Os pagamentos mantidos ficam em histórico próprio no relatório e no CSV, com os valores originais,
+datas, responsáveis e motivo; continuam na receita, mas não contam como inscrições atuais.
+Exclusões interrompidas aparecem na lista em **Exclusões em processamento** e podem ser retomadas
+pela opção original, mesmo quando a inscrição já foi removida.
+
 ## ☁️ Configuração Cloudflare R2 (CORS)
 
 Para permitir o upload direto de banners do navegador para o R2, você deve configurar o CORS no bucket `fazag-eventos`:

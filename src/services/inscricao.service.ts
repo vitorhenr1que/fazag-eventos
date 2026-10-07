@@ -328,6 +328,7 @@ export class InscricaoService {
                 if (inscricao.status !== 'PENDENTE') throw new AppError('Esta inscrição não está pendente de aprovação', 409)
                 const reembolso = await tx.reembolso.findUnique({ where: { inscricaoOriginalId: inscricaoId } })
                 if (reembolso) throw new AppError('Esta inscrição possui um reembolso registrado', 409)
+                if (await tx.exclusaoInscricao.findUnique({ where: { inscricaoOriginalId: inscricaoId } })) throw new AppError('Esta inscrição possui uma exclusão em andamento', 409)
                 const ocupadas = await tx.inscricao.count({ where: { eventoId: inscricao.eventoId, status: 'CONFIRMADA' } })
                 if (ocupadas >= inscricao.evento.totalVagas) throw new AppError('Não é possível aprovar: Vagas esgotadas para este evento')
                 const referencia = inscricao.valorReferencia ?? inscricao.evento.preco

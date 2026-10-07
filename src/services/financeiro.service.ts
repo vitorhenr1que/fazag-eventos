@@ -15,6 +15,7 @@ export class FinanceiroService {
             const locks = await tx.$queryRaw<{ adquirido: number | bigint | null }[]>`SELECT GET_LOCK(${lockName}, 10) AS adquirido`
             if (Number(locks[0]?.adquirido) !== 1) throw new AppError('Outra operação está em andamento. Tente novamente.', 409)
             try {
+                if (await tx.exclusaoInscricao.findUnique({ where: { inscricaoOriginalId: inscricaoId } })) throw new AppError('Esta inscrição possui uma exclusão registrada. Conclua a exclusão na lista de inscritos.', 409)
                 const existente = await tx.reembolso.findUnique({ where: { inscricaoOriginalId: inscricaoId } })
                 if (existente && dados.acao !== 'REEMBOLSO') throw new AppError('Esta inscrição possui um reembolso registrado', 409)
                 if (existente?.estado === 'CONCLUIDO') return { acao: 'REEMBOLSO', reembolso: existente }

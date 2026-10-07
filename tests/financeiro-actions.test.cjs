@@ -16,6 +16,7 @@ function ambiente(overrides = {}, falharUmaVez = false) {
         reembolso: null, subeventos: [{ id: 'sub-1' }], checkins: ['check-1'], certificados: ['cert-1'],
     }
     const db = {
+        exclusaoInscricao: { findUnique: async () => null },
         inscricao: {
             findUnique: async () => state.inscricao,
             update: async ({ data }) => (state.inscricao = { ...state.inscricao, ...data }),

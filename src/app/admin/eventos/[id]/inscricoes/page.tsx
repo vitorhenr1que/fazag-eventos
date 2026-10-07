@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 import { hasAdminPermission } from '@/lib/admin-permissions'
+import { ExcluirInscricaoDialog, type AlvoExclusao } from '@/components/admin/ExcluirInscricaoDialog'
 
 export default function InscricoesEventoPage() {
     const session = useAdminSession()
@@ -20,6 +21,15 @@ export default function InscricoesEventoPage() {
     const [inscricoes, setInscricoes] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [exporting, setExporting] = useState<string | null>(null)
+    const [alvoExclusao, setAlvoExclusao] = useState<AlvoExclusao | null>(null)
+    const [exclusoes, setExclusoes] = useState<{ inscricaoOriginalId: string; alunoNome: string; modalidade: string }[]>([])
+
+    async function atualizarInscricoes() {
+        const res = await apiFetch(`/api/admin/eventos/${params.id}/inscricoes`, { isAdmin: true })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error?.message || 'Não foi possível atualizar as inscrições')
+        setInscricoes(json.data); setExclusoes(json.exclusoesEmProcessamento ?? [])
+    }
 
     useEffect(() => {
         async function load() {
@@ -36,6 +46,7 @@ export default function InscricoesEventoPage() {
                 if (res.ok) {
                     const json = await res.json()
                     setInscricoes(json.data)
+                    setExclusoes(json.exclusoesEmProcessamento ?? [])
                 }
             } finally {
                 setLoading(false)
@@ -608,6 +619,11 @@ export default function InscricoesEventoPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right space-x-2">
+                                                {hasAdminPermission(session.role, 'ADMINISTRADOR') && <Button size="sm" variant="outline" className="h-8 text-[11px] text-red-700"
+                                                    disabled={exclusoes.some(e => e.inscricaoOriginalId === insc.id)}
+                                                    onClick={() => setAlvoExclusao({ id: insc.id, nome: insc.aluno.nome, status: insc.status, situacaoFinanceira: insc.situacaoFinanceira, valorPago: insc.valorPago ?? null })}>
+                                                    <Trash2 size={12} className="mr-1" />Excluir inscrição
+                                                </Button>}
                                                 {insc.status === 'PENDENTE' && hasAdminPermission(session.role, 'FINANCEIRO') && (
                                                     <Button size="sm" variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50 h-8 text-[11px]" onClick={() => handleAprovarPagamento(insc.id)}>
                                                         Aprovar
@@ -632,6 +648,12 @@ export default function InscricoesEventoPage() {
                     )}
                 </CardContent>
             </Card>
+            {exclusoes.length > 0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="Exclusões em processamento">
+                <h2 className="font-semibold">Exclusões em processamento</h2><p className="text-sm">Conclua as operações iniciadas para atualizar a lista e o relatório financeiro.</p>
+                {exclusoes.map(e => <div key={e.inscricaoOriginalId} className="flex items-center justify-between gap-2"><span>{e.alunoNome}</span>
+                    <Button variant="outline" size="sm" onClick={() => setAlvoExclusao({ id: e.inscricaoOriginalId, nome: e.alunoNome, status: 'CONFIRMADA', situacaoFinanceira: null, valorPago: null, modalidadeOriginal: e.modalidade })}>Concluir exclusão</Button></div>)}
+            </section>}
+            {alvoExclusao && <ExcluirInscricaoDialog key={alvoExclusao.id} alvo={alvoExclusao} pago={evento?.tipo === 'PAGO' || Boolean(alvoExclusao.modalidadeOriginal)} fechar={() => setAlvoExclusao(null)} atualizar={atualizarInscricoes} />}
         </div>
     )
 }

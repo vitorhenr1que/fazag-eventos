@@ -30,7 +30,9 @@ export async function GET(
             const { valorReferencia, valorPago, valorDesconto, situacaoFinanceira, dataPagamento, aprovadoPor, observacaoFinanceira, ...operacional } = inscricao
             return operacional
         })
-        return NextResponse.json({ success: true, count: inscricoes.length, data })
+        const exclusoesEmProcessamento = hasAdminPermission(admin.role, 'ADMINISTRADOR')
+            ? await prisma.exclusaoInscricao.findMany({ where: { eventoId: id, estado: 'PROCESSANDO' }, select: { inscricaoOriginalId: true, alunoNome: true, modalidade: true } }) : []
+        return NextResponse.json({ success: true, count: inscricoes.length, data, exclusoesEmProcessamento }, { headers: { 'Cache-Control': 'no-store' } })
     } catch (error) {
         return handleApiError(error)
     }

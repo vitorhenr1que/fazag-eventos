@@ -1,5 +1,5 @@
 export type AdminRole = 'ADMIN' | 'SUPER_ADMIN' | 'NUPPEX' | 'FINANCEIRO'
-export type AdminPermission = 'GESTAO' | 'FINANCEIRO' | 'SESSAO'
+export type AdminPermission = 'GESTAO' | 'FINANCEIRO' | 'SESSAO' | 'ADMINISTRADOR'
 export interface AdminSession { id: string; nome: string; email: string; role: AdminRole }
 
 export function isAdminRole(role: string): role is AdminRole {
@@ -9,6 +9,7 @@ export function hasAdminPermission(role: string, permission: AdminPermission) {
     if (!isAdminRole(role)) return false
     if (permission === 'SESSAO') return true
     if (role === 'ADMIN' || role === 'SUPER_ADMIN') return true
+    if (permission === 'ADMINISTRADOR') return false
     return permission === 'FINANCEIRO' ? role === 'FINANCEIRO' : role === 'NUPPEX'
 }
 export function adminHome(role: string) {

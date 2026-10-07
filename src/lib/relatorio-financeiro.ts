@@ -11,6 +11,7 @@ export interface RegistroFinanceiro {
     observacaoFinanceira: string | null
     aluno: { id: string; nome: string; email: string | null }
     reembolsoEmProcessamento?: boolean
+    exclusaoEmProcessamento?: boolean
 }
 
 export interface RegistroReembolso {
@@ -30,6 +31,12 @@ export interface RegistroReembolso {
     motivo: string | null
 }
 
+export interface PagamentoMantido extends RegistroFinanceiro {
+    dataExclusao: string
+    responsavelExclusao: string | null
+    motivo: string | null
+}
+
 export const situacoesFinanceiras: Record<string, string> = {
     PAGO: 'Pago integral', DESCONTO: 'Pago com desconto', ISENTO: 'Isento',
     GRATUITO: 'Gratuito', PENDENTE: 'Pendente', SEM_REGISTRO: 'Sem registro financeiro',
@@ -37,7 +44,7 @@ export const situacoesFinanceiras: Record<string, string> = {
 export function situacaoDoRegistro(registro: RegistroFinanceiro) {
     return registro.status === 'PENDENTE' ? 'PENDENTE' : registro.situacaoFinanceira || 'SEM_REGISTRO'
 }
-export function resumirFinanceiro(registros: RegistroFinanceiro[], precoAtual: number, reembolsos: RegistroReembolso[] = []) {
+export function resumirFinanceiro(registros: RegistroFinanceiro[], precoAtual: number, reembolsos: RegistroReembolso[] = [], pagamentosMantidos: PagamentoMantido[] = []) {
     const resumo = { inscritos: registros.length, confirmados: 0, pagos: 0, comDesconto: 0, isentos: 0, gratuitos: 0,
         pendentes: 0, semRegistro: 0, recebido: 0, descontos: 0, isencoes: 0, aReceber: 0, pendentesSemValor: 0 }
     for (const registro of registros) {
@@ -70,9 +77,14 @@ export function resumirFinanceiro(registros: RegistroFinanceiro[], precoAtual: n
         resumo.recebido += centavos
         qtdReembolsos++
     }
+    let valorMantido = 0
+    for (const pagamento of pagamentosMantidos) valorMantido += Math.round(Number(pagamento.valorPago ?? 0) * 100)
+    resumo.recebido += valorMantido
     return { ...resumo, recebido: resumo.recebido / 100, descontos: resumo.descontos / 100,
         isencoes: resumo.isencoes / 100, aReceber: resumo.aReceber / 100,
-        reembolsado: reembolsado / 100, saldo: (resumo.recebido - reembolsado) / 100, qtdReembolsos, reembolsosEmProcessamento }
+        reembolsado: reembolsado / 100, saldo: (resumo.recebido - reembolsado) / 100, qtdReembolsos, reembolsosEmProcessamento,
+        valorMantido: valorMantido / 100, pagamentosMantidos: pagamentosMantidos.length,
+        mantidosSemValor: pagamentosMantidos.filter(p => p.valorPago === null).length }
 }
 
 export function celulaCsv(valor: unknown) {

@@ -158,6 +158,32 @@ model Reembolso {
   @@map("reembolsos")
 }
 
+// Registro independente para preservar recebimentos e retomar exclusões interrompidas.
+model ExclusaoInscricao {
+  id String @id @default(cuid()) @db.VarChar(25)
+  inscricaoOriginalId String @unique @db.VarChar(25)
+  eventoId String @db.VarChar(25)
+  alunoId String @db.VarChar(36)
+  alunoNome String @db.VarChar(120)
+  alunoEmail String? @db.VarChar(190)
+  modalidade String @db.VarChar(20)
+  estado String @default("PROCESSANDO") @db.VarChar(20)
+  dataExclusao DateTime @default(now())
+  excluidoPor String @db.VarChar(25)
+  motivo String? @db.VarChar(500)
+  valorReferencia Decimal? @db.Decimal(10, 2)
+  valorPago Decimal? @db.Decimal(10, 2)
+  valorDesconto Decimal? @db.Decimal(10, 2)
+  situacaoFinanceira String? @db.VarChar(20)
+  dataInscricao DateTime
+  dataPagamento DateTime?
+  aprovadoPor String? @db.VarChar(25)
+  observacaoFinanceira String? @db.VarChar(500)
+
+  @@index([eventoId, estado])
+  @@map("exclusoes_inscricoes")
+}
+
 model CheckIn {
   id                   String              @id @default(cuid()) @db.VarChar(25)
   dataHora             DateTime            @default(now())

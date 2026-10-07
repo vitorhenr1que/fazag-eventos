@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiFetch } from '@/lib/api-client'
-import { celulaCsv, resumirFinanceiro, situacaoDoRegistro, situacoesFinanceiras, type RegistroFinanceiro, type RegistroReembolso } from '@/lib/relatorio-financeiro'
+import { celulaCsv, resumirFinanceiro, situacaoDoRegistro, situacoesFinanceiras, type RegistroFinanceiro, type RegistroReembolso, type PagamentoMantido } from '@/lib/relatorio-financeiro'
 import { Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 import { hasAdminPermission } from '@/lib/admin-permissions'
 
-interface EventoFinanceiro { id: string; nome: string; preco: string | null; tipo: string; inscricoes: RegistroFinanceiro[]; reembolsos: RegistroReembolso[] }
+interface EventoFinanceiro { id: string; nome: string; preco: string | null; tipo: string; inscricoes: RegistroFinanceiro[]; reembolsos: RegistroReembolso[]; pagamentosMantidos: PagamentoMantido[]; exclusoesEmProcessamento: number }
 const moeda = (valor: string | number | null) => valor === null ? 'Não registrado' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(valor))
 const data = (valor: string | null) => valor ? new Date(valor).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'
 
@@ -55,7 +55,10 @@ export default function FinanceiroPage() {
 
     const registros = evento?.inscricoes ?? []
     const reembolsos = evento?.reembolsos ?? []
-    const resumo = resumirFinanceiro(registros, Number(evento?.preco ?? 0), reembolsos)
+    const mantidos = evento?.pagamentosMantidos ?? []
+    const resumo = resumirFinanceiro(registros, Number(evento?.preco ?? 0), reembolsos, mantidos)
+    const mantidosFiltrados = mantidos.filter(i => (situacao === 'TODOS' || situacaoDoRegistro(i) === situacao)
+        && `${i.aluno.nome} ${i.aluno.email ?? ''} ${i.aluno.id}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))
     const filtrados = registros.filter(i => (situacao === 'TODOS' || situacaoDoRegistro(i) === situacao)
         && `${i.aluno.nome} ${i.aluno.email ?? ''} ${i.aluno.id}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))
     const reembolsosFiltrados = reembolsos.filter(r => `${r.alunoNome} ${r.alunoEmail ?? ''} ${r.alunoId}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))
@@ -107,6 +110,11 @@ export default function FinanceiroPage() {
             ['Aluno', 'ID aluno', 'Email', 'Valor reembolsado (R$)', 'Estado', 'Pagamento original', 'Data reembolso', 'Responsável', 'Motivo'],
             ...reembolsosFiltrados.map(r => [r.alunoNome, r.alunoId, r.alunoEmail, Number(r.valorPago).toFixed(2),
                 r.estado, data(r.dataPagamento), data(r.dataReembolso), r.responsavelReembolso, r.motivo]),
+            [], ['Pagamentos mantidos sem inscrição (conforme filtros)'],
+            ['Aluno', 'ID aluno', 'Email', 'Situação', 'Referência (R$)', 'Recebido (R$)', 'Desconto / isenção (R$)', 'Pagamento', 'Aprovado por', 'Observação pagamento', 'Exclusão', 'Excluído por', 'Motivo'],
+            ...mantidosFiltrados.map(i => [i.aluno.nome, i.aluno.id, i.aluno.email, situacoesFinanceiras[situacaoDoRegistro(i)],
+                i.valorReferencia, i.valorPago, i.valorDesconto, data(i.dataPagamento), i.responsavel, i.observacaoFinanceira,
+                data(i.dataExclusao), i.responsavelExclusao, i.motivo]),
         ]
         const url = URL.createObjectURL(new Blob(['\uFEFF' + linhas.map(linha => linha.map(celulaCsv).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' }))
         const link = document.createElement('a'); link.href = url; link.download = `financeiro-${evento.id}.csv`; link.click(); URL.revokeObjectURL(url)
@@ -141,11 +149,13 @@ export default function FinanceiroPage() {
                     ['Valor das isenções', moeda(resumo.isencoes)], ['A receber (estimativa)', moeda(resumo.aReceber)],
                     ['Reembolsos concluídos', resumo.qtdReembolsos], ['Total reembolsado', moeda(resumo.reembolsado)],
                     ['Saldo após reembolsos', moeda(resumo.saldo)], ['Reembolsos em processamento', resumo.reembolsosEmProcessamento],
+                    ['Recebimentos mantidos sem inscrição', moeda(resumo.valorMantido)], ['Registros mantidos sem inscrição', resumo.pagamentosMantidos],
                 ].map(([titulo, valor]) => <div key={titulo} className={`rounded-xl border bg-white p-5 ${titulo === 'Saldo após reembolsos' ? 'border-green-300 bg-green-50' : ''}`}>
                     <p className="text-sm text-slate-500">{titulo}</p><p className="mt-2 text-2xl font-bold text-slate-800 tabular-nums">{valor}</p>
                 </div>)}
             </div>
-            <p className="text-sm text-slate-600">O bruto inclui pagamentos posteriormente reembolsados. O saldo desconta essas devoluções. Cancelamentos de pagamento saem dos totais e não geram reembolso. Os inscritos e pagos contam somente as inscrições atuais.</p>
+            <p className="text-sm text-slate-600">O bruto inclui pagamentos posteriormente reembolsados e pagamentos mantidos após excluir a inscrição. O saldo desconta as devoluções. Exclusões completas e cancelamentos de pagamento saem dos totais sem gerar reembolso. Os inscritos e pagos contam somente as inscrições atuais.</p>
+            {evento.exclusoesEmProcessamento > 0 && <p role="alert" className="rounded border border-amber-200 bg-amber-50 p-4 text-amber-800">Há exclusão em processamento. O ADMINISTRADOR deve concluí-la na lista de inscritos antes de considerar os totais definitivos.</p>}
             {resumo.reembolsosEmProcessamento > 0 && <p role="alert" className="rounded border border-amber-200 bg-amber-50 p-4 text-amber-800">Há reembolso(s) em processamento. Use “Concluir reembolso” no histórico para finalizar a exclusão e atualizar os totais.</p>}
             <p className="text-sm text-slate-600">O valor a receber considera as inscrições pendentes antes de descontos e isenções futuras. {resumo.pendentesSemValor > 0 && `${resumo.pendentesSemValor} pendência(s) antiga(s) usam o preço atual nesta estimativa.`} {resumo.semRegistro > 0 && 'Aprovações antigas sem valores registrados não entram na arrecadação.'}</p>
             <div className="flex flex-wrap gap-4">
@@ -170,7 +180,8 @@ export default function FinanceiroPage() {
                         <td className="p-4 text-xs whitespace-nowrap">Inscrição: {data(i.dataInscricao)}<br />Aprovação: {data(i.dataPagamento)}</td>
                         <td className="p-4"><p>{i.responsavel || '—'}</p><p className="text-xs text-slate-500 break-words max-w-xs">{i.observacaoFinanceira || '—'}</p></td>
                         <td className="p-4">
-                            {i.reembolsoEmProcessamento ? <span className="text-xs text-amber-700">Reembolso em processamento</span>
+                            {i.exclusaoEmProcessamento ? <span className="text-xs text-amber-700">Exclusão em processamento</span>
+                            : i.reembolsoEmProcessamento ? <span className="text-xs text-amber-700">Reembolso em processamento</span>
                             : i.status === 'CONFIRMADA' && i.situacaoFinanceira !== 'GRATUITO' && (evento.tipo === 'PAGO' || ['PAGO', 'DESCONTO', 'ISENTO'].includes(i.situacaoFinanceira || '')) ? <div className="flex flex-col gap-2">
                                 {(i.valorPago === null || Number(i.valorPago) > 0) && <Button size="sm" variant="outline" className="text-red-700" disabled={processando}
                                     onClick={() => abrirAcao('REEMBOLSO', i.id, i.aluno.nome, i.valorPago)}>Reembolsar</Button>}
@@ -180,6 +191,22 @@ export default function FinanceiroPage() {
                     </tr>)}{filtrados.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-slate-500">Nenhuma inscrição encontrada.</td></tr>}</tbody>
                 </table>
             </div>
+            <section className="space-y-3" aria-labelledby="mantidos-titulo">
+                <h2 id="mantidos-titulo" className="text-xl font-bold text-slate-800">Pagamentos mantidos sem inscrição</h2>
+                <p className="text-sm text-slate-500">Os valores registrados continuam na arrecadação, sem contar o aluno como inscrito e sem registrar reembolso. A busca e o filtro de situação também se aplicam aqui.</p>
+                {resumo.mantidosSemValor > 0 && <p className="text-sm text-amber-800">{resumo.mantidosSemValor} aprovação(ões) antiga(s) sem valor registrado não entra(m) na arrecadação.</p>}
+                <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50"><tr>{['Aluno', 'Situação', 'Referência', 'Recebido', 'Desconto / isenção', 'Pagamento / responsável', 'Exclusão / responsável', 'Observações'].map(t => <th key={t} scope="col" className="p-4 whitespace-nowrap">{t}</th>)}</tr></thead>
+                    <tbody className="divide-y">{mantidosFiltrados.map(i => <tr key={i.id}>
+                        <td className="p-4"><p className="font-semibold">{i.aluno.nome}</p><p className="text-xs text-slate-500">{i.aluno.email || i.aluno.id}</p></td>
+                        <td className="p-4">{situacoesFinanceiras[situacaoDoRegistro(i)]}</td><td className="p-4 whitespace-nowrap">{moeda(i.valorReferencia)}</td>
+                        <td className="p-4 font-semibold whitespace-nowrap">{moeda(i.valorPago)}</td><td className="p-4 whitespace-nowrap">{moeda(i.valorDesconto)}</td>
+                        <td className="p-4">{data(i.dataPagamento)}<p className="text-xs text-slate-500">{i.responsavel || '—'}</p></td>
+                        <td className="p-4">{data(i.dataExclusao)}<p className="text-xs text-slate-500">{i.responsavelExclusao || '—'}</p></td>
+                        <td className="p-4"><p>{i.observacaoFinanceira || '—'}</p><p className="text-xs text-slate-500">Motivo da exclusão: {i.motivo || '—'}</p></td>
+                    </tr>)}{mantidosFiltrados.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">Nenhum pagamento mantido sem inscrição.</td></tr>}</tbody>
+                </table></div>
+            </section>
             <section className="space-y-3" aria-labelledby="reembolsos-titulo">
                 <h2 id="reembolsos-titulo" className="text-xl font-bold text-slate-800">Histórico de reembolsos</h2>
                 <p className="text-sm text-slate-500">O histórico permanece após excluir a inscrição. A busca por aluno também filtra esta lista.</p>
