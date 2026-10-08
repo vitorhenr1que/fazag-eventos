@@ -20,7 +20,7 @@ npx prisma migrate deploy
 npx prisma generate
 ```
 
-A migração foi criada, sem aplicação em banco e sem deploy. Não preenche reservas, horários ou valores históricos de registros antigos.
+A migração foi aplicada no banco configurado do projeto em 08/10/2026; o status foi confirmado sem migrações pendentes. Não preenche reservas, horários ou valores históricos de registros antigos.
 
 `ReservaPix.inscricaoId` é um vínculo lógico permanente com o identificador original, seguindo os históricos independentes de reembolsos e exclusões. Não há FK ou cascade para uma tabela que pode ser MyISAM. Reservas permanecem após excluir a inscrição. `reservaPixId` registra a reserva selecionada na conferência; o valor reconhecido fica em `valorReferencia`. Em desconto fora do prazo, o valor reconhecido é o preço atual, embora a reserva selecionada permaneça registrada para auditoria.
 
@@ -94,7 +94,7 @@ Exemplo de divergência administrativa:
 }
 ```
 
-Pode ser aprovado depois das 14:30: o horário conferido no comprovante precisa estar entre geração (inclusive) e vencimento (exclusive), sem estar no futuro. `PAGO` exige igualdade em centavos entre recebido e referência reconhecida. `dataPagamento` continua sendo o horário da aprovação; `dataTransferencia` é separado.
+O horário da transferência é opcional. Quando informado, precisa estar entre geração (inclusive) e vencimento (exclusive), sem estar no futuro, permitindo aprovação depois das 14:30. Sem horário, a aprovação usa o valor da reserva selecionada, inclusive vencida, sem exigir confirmação do prazo. A seleção fica registrada na observação, sem preencher `dataTransferencia` ou afirmar que o prazo foi conferido. Reservas invalidadas não podem ser reconhecidas por essa seleção. `PAGO` exige igualdade em centavos entre recebido e referência reconhecida. `dataPagamento` continua sendo o horário da aprovação; `dataTransferencia` é separado.
 
 Sem reserva, inclusive pagamento antigo, usar fluxo manual explícito. `valorReferencia` antigo de pendente não garante preço anterior:
 
@@ -102,13 +102,12 @@ Sem reserva, inclusive pagamento antigo, usar fluxo manual explícito. `valorRef
 {
   "modalidade": "PAGO",
   "valorPago": 100.00,
-  "dataTransferencia": "2026-11-03T14:35:00-03:00",
   "semReservaConferida": true,
   "observacao": "Pagamento sem reserva conferido; preço atual aplicado"
 }
 ```
 
-Transferência fora do prazo não pode usar a reserva para aprovação integral. A decisão explícita de conceder desconto usa a referência atual (ou ajuste financeiro previamente concedido), com valor maior que zero e menor que a referência:
+Quando a API recebe o horário de uma transferência fora do prazo, não permite usar a reserva para aprovação integral. A decisão explícita de conceder desconto usa a referência atual (ou ajuste financeiro previamente concedido), com valor maior que zero e menor que a referência:
 
 ```json
 {
@@ -120,13 +119,26 @@ Transferência fora do prazo não pode usar a reserva para aprovação integral.
 }
 ```
 
+Aprovação pela tela, sem preencher data/hora ou confirmar o prazo:
+
+```json
+{
+  "modalidade": "PAGO",
+  "quoteId": "cmreservaexemplo0000000001",
+  "valorPago": 75.00,
+  "observacao": "Pagamento integral conferido com reserva Pix."
+}
+```
+
+Sem reserva, não é necessário informar horário: mantenha `semReservaConferida: true` e a observação de conferência manual. O pagamento integral usa a referência atual, e desconto mantém o valor efetivamente recebido. Sem o horário, o servidor não consegue verificar automaticamente o intervalo da transferência; o preço é reconhecido pela seleção manual da reserva, inclusive vencida, sem validação do intervalo da transferência.
+
 Isenção não exige nem deve enviar dados de uma transferência:
 
 ```json
 { "modalidade": "ISENTO", "observacao": "Isenção autorizada pelo financeiro" }
 ```
 
-A tela de Pendentes concentra seleção da reserva (inclusive vencida), recebido, horário do comprovante em Bahia/UTC−03:00 e observação. A tela de inscritos encaminha para essa conferência. A API antiga sem dados de pagamento será recusada. Valores já confirmados não são recalculados pelo preço atual. Relatórios e CSV mostram referência, recebido, reserva, transferência e aprovação/responsável; históricos desconhecidos continuam sem valores inferidos.
+A tela de Pendentes concentra seleção da reserva (inclusive vencida) e modalidade, sem confirmação do prazo. Não há campo de data/hora da transferência. No pagamento integral, valor recebido e observação não aparecem como campos: a tela envia automaticamente a referência reconhecida (preço atual ou reserva selecionada não invalidada) e registra uma observação de conferência. Desconto permite informar o recebido e a observação; isenção mantém apenas a observação. A tela de inscritos encaminha para essa conferência. A API antiga sem dados de pagamento será recusada. Valores já confirmados não são recalculados pelo preço atual. Relatórios e CSV mostram referência, recebido, reserva, transferência e aprovação/responsável; históricos desconhecidos continuam sem valores inferidos.
 
 ## Integração do aplicativo
 
@@ -149,7 +161,7 @@ npm run build
 git diff --check
 ```
 
-Testes de serviço/API usam banco e relógio simulados, incluindo fila de locks, fronteira exata de vencimento, virada de lote, outro aparelho, aprovação tardia, divergências, permissões, vagas, operações concorrentes, autocommit e históricos. Não foi executado teste contra MySQL real nem aplicada migração.
+Testes de serviço/API usam banco e relógio simulados, incluindo fila de locks, fronteira exata de vencimento, virada de lote, outro aparelho, aprovação tardia, divergências, permissões, vagas, operações concorrentes, autocommit e históricos. Os testes de serviço/API não executam contra MySQL real. A migração foi aplicada e o status do banco foi verificado separadamente.
 
 BR Code e CRC16 seguem o [Manual de Padrões para Iniciação do Pix do Banco Central](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/II_ManualdePadroesparaIniciacaodoPix.pdf), com teste do vetor oficial `1D3D`.
 

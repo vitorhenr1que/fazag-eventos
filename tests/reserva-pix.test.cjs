@@ -314,3 +314,58 @@ test('cancelar aprovação antiga arquiva dados conhecidos sem inventar transfer
     assert.equal(state.cancelado.dataPagamento, null); assert.equal(state.cancelado.dataTransferencia, undefined)
     assert.equal(state.cancelado.valorReferencia, 50); assert.equal(state.inscricao.valorReferencia, null)
 })
+
+test('aprova integral sem horário pelo preço atual e mantém transferência sem registro', async () => {
+    const { state, aprovar } = ambiente()
+    state.inscricao.evento.preco = 100
+    const dados = { modalidade: 'PAGO', valorPago: 100, semReservaConferida: true, observacao: 'Pagamento integral conferido manualmente' }
+    const r = await aprovar.aprovarInscricao('i1', dados, 'admin1')
+    assert.equal(r.valorReferencia, 100); assert.equal(r.valorPago, 100)
+    assert.equal(r.dataTransferencia, null); assert.equal(r.reservaPixId, null)
+    assert.equal(r.dataPagamento.getTime(), state.now)
+})
+
+test('aprova reserva selecionada vencida sem horário ou confirmação de prazo', async () => {
+    const { state, pix, aprovar } = ambiente()
+    const q = await pix.obter('i1', 'a1', true)
+    state.now += 3600000; state.inscricao.evento.preco = 100
+    await assert.rejects(aprovar.aprovarInscricao('i1', { modalidade: 'PAGO', quoteId: q.quoteId, valorPago: 70 }, 'admin1'),
+        error => error.code === 'VALOR_DIVERGENTE')
+    const r = await aprovar.aprovarInscricao('i1', { modalidade: 'PAGO', quoteId: q.quoteId, valorPago: 75,
+        observacao: 'a'.repeat(500) }, 'admin1')
+    assert.equal(r.valorReferencia, 75); assert.equal(r.valorPago, 75); assert.equal(r.dataTransferencia, null)
+    assert.equal(r.reservaPixId, q.quoteId); assert.equal(r.dataPagamento.getTime(), state.now)
+    assert.match(r.observacaoFinanceira, /Reserva Pix selecionada na aprovação; horário da transferência não informado\./)
+    assert.equal(r.observacaoFinanceira.length, 500)
+})
+
+test('aprovação sem confirmação preserva validação de horário informado e reserva invalidada', async () => {
+    for (const hora of ['2026-11-03T14:30:00-03:00', '2026-11-03T18:20:00-03:00', '2026-11-03T14:20:00']) {
+        const { state, pix, aprovar } = ambiente(); const q = await pix.obter('i1', 'a1', true)
+        state.now += 3600000
+        await assert.rejects(aprovar.aprovarInscricao('i1', pago(q.quoteId, hora), 'admin1'))
+    }
+    const { pix, state, aprovar } = ambiente(); const q = await pix.obter('i1', 'a1', true)
+    state.reservas[0].invalidadaAt = new Date(state.now)
+    await assert.rejects(aprovar.aprovarInscricao('i1', { modalidade: 'PAGO', quoteId: q.quoteId, valorPago: 75 }, 'admin1'))
+})
+
+test('desconto dispensa horário sem perder valor recebido, motivo e conferência manual', async () => {
+    const { state, aprovar } = ambiente()
+    const r = await aprovar.aprovarInscricao('i1', { modalidade: 'DESCONTO', valorPago: 60,
+        semReservaConferida: true, observacao: 'Desconto autorizado' }, 'admin1')
+    assert.equal(r.valorReferencia, 75); assert.equal(r.valorPago, 60); assert.equal(r.valorDesconto, 15)
+    assert.equal(r.dataTransferencia, null); assert.equal(r.observacaoFinanceira, 'Desconto autorizado')
+    assert.equal(r.dataPagamento.getTime(), state.now)
+})
+
+test('endpoint administrativo aceita aprovação com reserva sem data ou confirmação do prazo', async () => {
+    const { pix, state, adminApi } = ambiente()
+    const q = await pix.obter('i1', 'a1', true); state.now += 3600000
+    const dados = { modalidade: 'PAGO', quoteId: q.quoteId, valorPago: 75 }
+    const resposta = await adminApi.POST(request(dados), context)
+    assert.equal(resposta.status, 200)
+    const { data } = await resposta.json()
+    assert.equal(data.dataTransferencia, null); assert.equal(data.valorPago, 75)
+    assert.match(data.observacaoFinanceira, /Reserva Pix selecionada na aprovação/)
+})

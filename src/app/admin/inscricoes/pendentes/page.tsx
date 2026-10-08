@@ -25,9 +25,7 @@ export default function InscricoesPendentesPage() {
     const [modalidade, setModalidade] = useState<Modalidade>('PAGO')
     const [quoteId, setQuoteId] = useState('')
     const [valorPago, setValorPago] = useState('')
-    const [transferencia, setTransferencia] = useState('')
     const [observacao, setObservacao] = useState('')
-    const [semReserva, setSemReserva] = useState(false)
     const [agora, setAgora] = useState(0)
     const relogioRef = useRef({ servidor: 0, local: 0 })
     const dialogRef = useRef<HTMLDialogElement>(null)
@@ -62,25 +60,28 @@ export default function InscricoesPendentesPage() {
     }, []) // O prazo mostrado avança a partir do relógio devolvido pelo servidor.
 
     function abrir(inscricao: Pendente) {
-        setModalidade('PAGO'); setQuoteId(''); setValorPago(''); setTransferencia(''); setObservacao(''); setSemReserva(false); setAlvo(inscricao)
+        setModalidade('PAGO'); setQuoteId(''); setValorPago(''); setObservacao(''); setAlvo(inscricao)
     }
     const reserva = alvo?.reservasPix.find(r => r.id === quoteId)
-    const horario = transferencia ? new Date(`${transferencia}:00-03:00`).getTime() : NaN
-    const dentro = reserva && horario >= Date.parse(reserva.createdAt) && horario < Date.parse(reserva.expiresAt)
-        && (!reserva.invalidadaAt || horario < Date.parse(reserva.invalidadaAt))
+    const reservaUtilizavel = reserva && !reserva.invalidadaAt
     const ajusteExplicito = alvo && ['DESCONTO', 'ISENTO'].includes(alvo.situacaoFinanceira ?? '')
-    const referencia = modalidade !== 'ISENTO' && dentro ? reserva!.valor : ajusteExplicito ? alvo!.valorReferencia : alvo?.evento.preco ?? null
-    const divergente = modalidade === 'PAGO' && valorPago !== '' && Math.round(Number(valorPago.replace(',', '.')) * 100) !== Math.round(Number(referencia) * 100)
+    const referencia = modalidade !== 'ISENTO' && reservaUtilizavel ? reserva!.valor : ajusteExplicito ? alvo!.valorReferencia : alvo?.evento.preco ?? null
 
     async function aprovar() {
         if (!alvo || processing) return
+        if (modalidade === 'PAGO' && referencia === null) {
+            toast.error('Defina o preço do evento antes de aprovar'); return
+        }
         setProcessing(true)
         try {
             const res = await apiFetch(`/api/admin/inscricoes/${alvo.id}/aprovar`, {
-                method: 'POST', isAdmin: true, body: JSON.stringify({ modalidade, observacao,
+                method: 'POST', isAdmin: true, body: JSON.stringify({ modalidade,
+                    observacao: modalidade === 'PAGO'
+                        ? quoteId ? 'Pagamento integral conferido com reserva Pix.' : 'Pagamento integral sem reserva conferido manualmente pelo valor de referência apresentado.'
+                        : observacao,
                     ...(modalidade !== 'ISENTO' ? {
-                        valorPago: Number(valorPago.replace(',', '.')), dataTransferencia: `${transferencia}:00-03:00`,
-                        ...(quoteId ? { quoteId } : { semReservaConferida: semReserva }),
+                        valorPago: modalidade === 'PAGO' ? Number(referencia) : Number(valorPago.replace(',', '.')),
+                        ...(quoteId ? { quoteId } : { semReservaConferida: true }),
                     } : {}),
                 }),
             })
@@ -100,7 +101,7 @@ export default function InscricoesPendentesPage() {
 
     return <div className="space-y-6">
         <h1 className="text-3xl font-bold">Aprovações Pendentes</h1>
-        <p className="text-sm text-slate-600">Confira o comprovante recebido pelo WhatsApp do financeiro: +55 75 98218-1138. Uma reserva vencida pode ser reconhecida se a transferência ocorreu dentro do prazo. O Pix estático copiado continua utilizável no banco após o vencimento.</p>
+        <p className="text-sm text-slate-600">Confira o comprovante recebido pelo WhatsApp do financeiro: +55 75 98218-1138. A aprovação usa o valor da reserva selecionada, inclusive vencida, ou o preço atual quando não houver reserva. O Pix estático copiado continua utilizável no banco após o vencimento.</p>
         <Link href="/admin/financeiro" className="text-blue-700 underline">Ver relatório financeiro</Link>
         {loading ? <p role="status">Carregando...</p> : <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full text-left text-sm">
             <thead className="bg-slate-50"><tr>{['Aluno', 'Evento / preço atual', 'Reservas Pix', 'Solicitação', 'Conferência'].map(t => <th key={t} scope="col" className="p-4">{t}</th>)}</tr></thead>
@@ -121,22 +122,22 @@ export default function InscricoesPendentesPage() {
                 </select>
                 {modalidade !== 'ISENTO' ? <>
                     <label htmlFor="reserva" className="block">Reserva correspondente ao comprovante</label>
-                    <select id="reserva" className="w-full border rounded p-2" value={quoteId} disabled={processing} onChange={e => { setQuoteId(e.target.value); setSemReserva(false) }}>
+                    <select id="reserva" className="w-full border rounded p-2" value={quoteId} disabled={processing} onChange={e => setQuoteId(e.target.value)}>
                         <option value="">Sem reserva / pagamento antigo</option>{alvo.reservasPix.map(r => <option key={r.id} value={r.id}>{moeda(r.valor)} · {r.txid} · até {data(r.expiresAt)}</option>)}
                     </select>
                     {reservas(alvo)}
-                    {!quoteId && <label className="flex gap-2"><input type="checkbox" required checked={semReserva} disabled={processing} onChange={e => setSemReserva(e.target.checked)} />Conferi manualmente o pagamento sem reserva. Aplicar o preço atual ou ajuste financeiro explícito.</label>}
-                    <label htmlFor="valor-pago" className="block">Valor efetivamente recebido (R$)</label>
-                    <Input id="valor-pago" inputMode="decimal" required disabled={processing} value={valorPago} onChange={e => setValorPago(e.target.value)} />
-                    <label htmlFor="transferencia" className="block">Data e hora no comprovante (Bahia, UTC−03:00)</label>
-                    <Input id="transferencia" type="datetime-local" required disabled={processing} value={transferencia} onChange={e => setTransferencia(e.target.value)} />
-                    {reserva && transferencia && !dentro && <p role="alert" className="text-amber-800">Transferência fora do prazo. Para conceder desconto sobre o preço atual, selecione Desconto e registre o motivo. Pagamento integral com esta reserva será recusado.</p>}
-                    {divergente && <p role="alert" className="text-red-700">Valor divergente. Confira os dados ou selecione Desconto explicitamente quando o valor recebido for menor.</p>}
+                    {modalidade === 'DESCONTO' && <>
+                        <label htmlFor="valor-pago" className="block">Valor efetivamente recebido (R$)</label>
+                        <Input id="valor-pago" inputMode="decimal" required disabled={processing} value={valorPago} onChange={e => setValorPago(e.target.value)} />
+                    </>}
+                    {reserva?.invalidadaAt && <p role="alert" className="text-amber-800">Reserva invalidada. Selecione a conferência sem reserva para aplicar o preço atual ou conceder desconto.</p>}
                 </> : <p>Isenção confirma sem transferência, com recebimento de R$ 0,00.</p>}
                 <p>Referência reconhecida: {moeda(referencia ?? null)}</p>
-                <label htmlFor="observacao" className="block">Observação / motivo</label>
-                <Input id="observacao" maxLength={500} required={modalidade !== 'ISENTO' && (!quoteId || !dentro)} disabled={processing} value={observacao} onChange={e => setObservacao(e.target.value)} />
-                <p className="text-xs text-slate-500">O horário da aprovação será registrado separadamente. A conferência é manual.</p>
+                {modalidade !== 'PAGO' && <>
+                    <label htmlFor="observacao" className="block">Observação / motivo</label>
+                    <Input id="observacao" maxLength={500} required={modalidade === 'DESCONTO' && (!quoteId || !reservaUtilizavel)} disabled={processing} value={observacao} onChange={e => setObservacao(e.target.value)} />
+                </>}
+                <p className="text-xs text-slate-500">O horário da aprovação será registrado. O horário da transferência não será informado; a conferência é manual.</p>
                 <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={processing} onClick={() => setAlvo(null)}>Voltar</Button>
                     <Button type="submit" disabled={processing}>{processing ? 'Salvando...' : 'Confirmar aprovação'}</Button></div>
             </form>}

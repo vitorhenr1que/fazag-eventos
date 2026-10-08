@@ -331,12 +331,17 @@ export class InscricaoService {
             if (dados.quoteId && (!reserva || reserva.inscricaoId !== inscricaoId)) throw new AppError('Reserva não pertence a esta inscrição', 400, 'PIX_RESERVA_INVALIDA')
             const { referencia, transferencia } = reconhecerReferencia(inscricao, reserva, dados)
             const pagamento = calcularPagamento(Number(referencia), dados)
+            const registroReserva = reserva && !transferencia
+                ? 'Reserva Pix selecionada na aprovação; horário da transferência não informado.' : ''
+            const observacaoFinanceira = registroReserva
+                ? [dados.observacao?.slice(0, 500 - registroReserva.length - 1), registroReserva].filter(Boolean).join(' ')
+                : dados.observacao || null
             const result = await tx.inscricao.updateMany({
                 where: { id: inscricaoId, status: 'PENDENTE' },
                 data: {
                     status: 'CONFIRMADA', valorReferencia: referencia, ...pagamento,
                     dataTransferencia: transferencia, reservaPixId: reserva?.id ?? null,
-                    dataPagamento: new Date(), aprovadoPor: adminId, observacaoFinanceira: dados.observacao || null,
+                    dataPagamento: new Date(), aprovadoPor: adminId, observacaoFinanceira,
                 },
             })
             if (result.count !== 1) throw new AppError('Esta inscrição já foi aprovada', 409)

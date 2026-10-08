@@ -44,7 +44,7 @@ export function calcularPagamento(referencia: number, dados: AprovacaoFinanceira
     return { situacaoFinanceira: dados.modalidade, valorPago: pago / 100, valorDesconto: (base - pago) / 100 }
 }
 
-// O horário é informado pelo financeiro após conferir o comprovante.
+// O horário é opcional. Sem ele, a aprovação utiliza a reserva selecionada.
 export function reconhecerReferencia(
     inscricao: { valorReferencia: unknown; situacaoFinanceira: string | null; evento: { preco: unknown } },
     reserva: { valor: unknown; createdAt: Date; expiresAt: Date; invalidadaAt: Date | null } | null,
@@ -52,11 +52,13 @@ export function reconhecerReferencia(
 ) {
     let transferencia: Date | null = null
     if (dados.modalidade !== 'ISENTO') {
-        if (!dados.dataTransferencia || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(dados.dataTransferencia)) {
-            throw new AppError('Informe a data/hora da transferência com fuso horário', 400, 'TRANSFERENCIA_OBRIGATORIA')
+        if (dados.dataTransferencia !== undefined) {
+            if (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(dados.dataTransferencia)) {
+                throw new AppError('Informe a data/hora da transferência com fuso horário', 400, 'TRANSFERENCIA_INVALIDA')
+            }
+            transferencia = new Date(dados.dataTransferencia)
+            if (!Number.isFinite(transferencia.getTime()) || transferencia > agora) throw new AppError('Horário da transferência inválido ou no futuro', 400, 'TRANSFERENCIA_INVALIDA')
         }
-        transferencia = new Date(dados.dataTransferencia)
-        if (!Number.isFinite(transferencia.getTime()) || transferencia > agora) throw new AppError('Horário da transferência inválido ou no futuro', 400, 'TRANSFERENCIA_INVALIDA')
         if (dados.valorPago === undefined) throw new AppError('Informe o valor efetivamente recebido')
         if (!dados.quoteId && (!dados.semReservaConferida || !dados.observacao?.trim())) {
             throw new AppError('Confirme a conferência manual sem reserva e registre uma observação', 400, 'CONFERENCIA_MANUAL_OBRIGATORIA')
@@ -64,8 +66,10 @@ export function reconhecerReferencia(
     } else if (dados.quoteId || dados.dataTransferencia || (dados.valorPago !== undefined && dados.valorPago !== 0)) {
         throw new AppError('Isenção não deve registrar uma transferência ou reserva')
     }
-    const dentro = reserva && transferencia && reserva.createdAt <= transferencia && transferencia < reserva.expiresAt
-        && (!reserva.invalidadaAt || transferencia < reserva.invalidadaAt)
+    const dentro = reserva && (transferencia
+        ? reserva.createdAt <= transferencia && transferencia < reserva.expiresAt
+            && (!reserva.invalidadaAt || transferencia < reserva.invalidadaAt)
+        : !reserva.invalidadaAt)
     if (reserva && !dentro && dados.modalidade === 'PAGO') {
         throw new AppError('Transferência fora do prazo da reserva. Confira sem reserva pelo preço atual ou conceda desconto explicitamente.', 400, 'PIX_FORA_DO_PRAZO')
     }

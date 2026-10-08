@@ -151,7 +151,7 @@ Os filtros afetam o detalhamento e sua exportação; os indicadores sempre repre
 
 Em `/admin/inscricoes/pendentes`:
 
-- **Aprovar** abre a conferência de reserva, valor recebido e horário da transferência. Pagamento integral exige correspondência com a referência reconhecida.
+- **Aprovar** abre a conferência de reserva e modalidade. Pagamento integral usa automaticamente a referência reconhecida, sem campos de valor recebido, observação ou data/hora. A seleção de uma reserva reconhece seu valor sem exigir confirmação do prazo.
 - **Desconto** permite informar o valor efetivamente recebido e confirmar o pagamento.
 - **Isenção** confirma sem recebimento e registra o valor dispensado.
 
@@ -227,6 +227,7 @@ Para permitir o upload direto de banners do navegador para o R2, você deve conf
 ## Reservas de preço Pix
 
 A API do aluno reserva o preço Pix por 30 minutos no servidor. A conferência manual
-em Pendentes registra a reserva, o recebido e o horário efetivo do comprovante,
-separadamente do horário da aprovação. Consulte [o contrato e a migração](docs/reservas-pix.md)
+em Pendentes registra a reserva e o recebido, com seleção manual da reserva, sem confirmação adicional do prazo.
+O horário da aprovação é registrado; informar o horário da transferência é opcional na API.
+Consulte [o contrato e a migração](docs/reservas-pix.md)
 para integrar o aplicativo, aplicar a migração e verificar o histórico financeiro.
