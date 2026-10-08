@@ -49,6 +49,7 @@ model Evento {
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
   preco                    Decimal?      @db.Decimal(10, 2)
+  chavePix                 String?       @db.VarChar(255)
 
   subeventos  Subevento[]
   inscricoes  Inscricao[]

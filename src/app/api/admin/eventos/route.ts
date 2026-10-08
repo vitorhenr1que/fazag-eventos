@@ -4,6 +4,7 @@ import { getAdminFromHeader } from '@/lib/auth-admin'
 import { EventoService } from '@/services/evento.service'
 import { handleApiError } from '@/lib/app-error'
 import { z } from 'zod'
+import { chavePixSchema } from '@/lib/evento-pagamento'
 
 const adminCreateEventoSchema = z.object({
     nome: z.string(),
@@ -20,6 +21,7 @@ const adminCreateEventoSchema = z.object({
     cargaHorariaBase: z.number().optional().nullable(),
     limiteSubeventosPorAluno: z.number().int().optional().nullable(),
     preco: z.number().optional().nullable(),
+    chavePix: chavePixSchema,
     bannerUrl: z.string().url().optional().nullable().or(z.literal('')),
 })
 

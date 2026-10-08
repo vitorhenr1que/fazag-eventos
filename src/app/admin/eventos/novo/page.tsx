@@ -39,6 +39,7 @@ export default function NovoEventoPage() {
         cargaHorariaBase: 2,
         limiteSubeventosPorAluno: 0,
         preco: 0,
+        chavePix: '',
         bannerUrl: '',
         certificado: {
             fundoUrl: undefined,
@@ -108,6 +109,7 @@ export default function NovoEventoPage() {
                     cargaHorariaBase: Number(formData.cargaHorariaBase),
                     limiteSubeventosPorAluno: Number(formData.limiteSubeventosPorAluno),
                     preco: formData.tipo === 'PAGO' ? Number(formData.preco) : null,
+                    chavePix: formData.tipo === 'PAGO' ? formData.chavePix.trim() || null : null,
                     dataInicio: new Date(formData.dataInicio).toISOString(),
                     dataFim: new Date(formData.dataFim).toISOString(),
                 }),
@@ -213,6 +215,21 @@ export default function NovoEventoPage() {
                                         value={formData.preco}
                                         onChange={e => setFormData({ ...formData, preco: Number(e.target.value) })}
                                         placeholder="Ex: 49.90"
+                                    />
+                                </div>
+                            )}
+
+                            {formData.tipo === 'PAGO' && (
+                                <div>
+                                    <label htmlFor="chavePix" className="text-sm font-medium mb-1 block">Chave Pix (opcional)</label>
+                                    <input
+                                        id="chavePix"
+                                        type="text"
+                                        maxLength={255}
+                                        className="w-full p-2 border rounded focus:ring-2 focus:ring-primary/20 outline-none"
+                                        value={formData.chavePix}
+                                        onChange={e => setFormData({ ...formData, chavePix: e.target.value })}
+                                        placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
                                     />
                                 </div>
                             )}

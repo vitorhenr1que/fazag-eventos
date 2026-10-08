@@ -1,0 +1,1 @@
+ALTER TABLE `eventos` ADD COLUMN `chavePix` VARCHAR(255) NULL;

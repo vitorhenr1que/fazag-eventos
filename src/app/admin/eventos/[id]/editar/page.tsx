@@ -48,6 +48,7 @@ export default function EditarEventoPage() {
                 setFormData({
                     ...ev,
                     tipoAtividadeId: ev.tipoAtividadeId || '',
+                    chavePix: ev.chavePix || '',
                     dataInicio: formatForInput(ev.dataInicio),
                     dataFim: formatForInput(ev.dataFim),
                     certificado: ev.certificado || {
@@ -90,6 +91,7 @@ export default function EditarEventoPage() {
                     cargaHorariaBase: payload.cargaHorariaBase ? Number(payload.cargaHorariaBase) : null,
                     limiteSubeventosPorAluno: payload.limiteSubeventosPorAluno ? Number(payload.limiteSubeventosPorAluno) : null,
                     preco: payload.tipo === 'PAGO' ? Number(payload.preco) : null,
+                    chavePix: payload.tipo === 'PAGO' ? payload.chavePix.trim() || null : null,
                     dataInicio: new Date(payload.dataInicio).toISOString(),
                     dataFim: new Date(payload.dataFim).toISOString(),
                     certificado: certData // Enviar dados para o upsert no repo
@@ -206,6 +208,21 @@ export default function EditarEventoPage() {
                                         value={formData.preco || ''}
                                         onChange={e => setFormData({ ...formData, preco: Number(e.target.value) })}
                                         placeholder="Ex: 49.90"
+                                    />
+                                </div>
+                            )}
+
+                            {formData.tipo === 'PAGO' && (
+                                <div>
+                                    <label htmlFor="chavePix" className="text-sm font-medium mb-1 block">Chave Pix (opcional)</label>
+                                    <input
+                                        id="chavePix"
+                                        type="text"
+                                        maxLength={255}
+                                        className="w-full p-2 border rounded focus:ring-2 focus:ring-primary/20 outline-none"
+                                        value={formData.chavePix}
+                                        onChange={e => setFormData({ ...formData, chavePix: e.target.value })}
+                                        placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
                                     />
                                 </div>
                             )}
