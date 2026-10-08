@@ -5,7 +5,7 @@ const { calcularPagamento, aprovacaoFinanceiraSchema, valorDoReembolso, acaoFina
 const { resumirFinanceiro, situacaoDoRegistro, celulaCsv } = require('../src/lib/relatorio-financeiro.ts')
 
 test('aprovação integral preserva R$ 30 mesmo após a virada para R$ 50', () => {
-    const pagamento = calcularPagamento(30, { modalidade: 'PAGO' })
+    const pagamento = calcularPagamento(30, { modalidade: 'PAGO', valorPago: 30 })
     const resumo = resumirFinanceiro([{ status: 'CONFIRMADA', valorReferencia: '30.00', ...pagamento }], 50)
     assert.equal(resumo.recebido, 30)
     assert.equal(resumo.pagos, 1)
@@ -48,7 +48,7 @@ test('relatório separa pagos, descontos, isentos, gratuitos e histórico descon
         { status: 'PENDENTE', situacaoFinanceira: null, valorReferencia: null },
     ], 50)
     assert.deepEqual(resumo, { inscritos: 7, confirmados: 5, pagos: 2, comDesconto: 1, isentos: 1,
-        gratuitos: 1, pendentes: 2, semRegistro: 1, recebido: 50, descontos: 10, isencoes: 30, aReceber: 80, pendentesSemValor: 1,
+        gratuitos: 1, pendentes: 2, semRegistro: 1, recebido: 50, descontos: 10, isencoes: 30, aReceber: 100, pendentesSemValor: 1,
         reembolsado: 0, saldo: 50, qtdReembolsos: 0, reembolsosEmProcessamento: 0,
         valorMantido: 0, pagamentosMantidos: 0, mantidosSemValor: 0 })
 })
@@ -89,7 +89,7 @@ test('cancelamento deixa pendência e exclui pagamento sem criar devolução', (
     assert.equal(resumo.reembolsado, 0)
     assert.equal(resumo.qtdReembolsos, 0)
     assert.equal(resumo.pendentes, 1)
-    assert.equal(resumo.aReceber, 30)
+    assert.equal(resumo.aReceber, 50)
 })
 
 test('reembolso usa valor original mesmo com desconto, novo lote ou valor enviado diferente', () => {

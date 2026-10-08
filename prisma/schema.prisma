@@ -107,6 +107,8 @@ model Inscricao {
   dataPagamento DateTime?
   aprovadoPor   String? @db.VarChar(25)
   observacaoFinanceira String? @db.VarChar(500)
+  reservaPixId String? @db.VarChar(25)
+  dataTransferencia DateTime?
 
   evento               Evento               @relation(fields: [eventoId], references: [id])
   aluno                Aluno                @relation(fields: [alunoId], references: [id])
@@ -150,6 +152,8 @@ model Reembolso {
   dataPagamento DateTime?
   aprovadoPor String? @db.VarChar(25)
   observacaoPagamento String? @db.VarChar(500)
+  reservaPixId String? @db.VarChar(25)
+  dataTransferencia DateTime?
   estado String @default("PROCESSANDO") @db.VarChar(20)
   dataReembolso DateTime @default(now())
   reembolsadoPor String @db.VarChar(25)
@@ -180,6 +184,8 @@ model ExclusaoInscricao {
   dataPagamento DateTime?
   aprovadoPor String? @db.VarChar(25)
   observacaoFinanceira String? @db.VarChar(500)
+  reservaPixId String? @db.VarChar(25)
+  dataTransferencia DateTime?
 
   @@index([eventoId, estado])
   @@map("exclusoes_inscricoes")
@@ -237,4 +243,47 @@ enum Role {
   SUPER_ADMIN
   NUPPEX
   FINANCEIRO
+}
+
+// Vínculo lógico, como reembolsos: MyISAM não suporta FK. Nunca apagar junto da inscrição.
+model ReservaPix {
+  id String @id @default(cuid()) @db.VarChar(25)
+  inscricaoId String @db.VarChar(25)
+  eventoId String @db.VarChar(25)
+  valor Decimal @db.Decimal(10, 2)
+  chavePix String @db.VarChar(77)
+  codigo String @db.Text
+  txid String @unique @db.VarChar(25)
+  createdAt DateTime
+  expiresAt DateTime
+  invalidadaAt DateTime?
+
+  @@index([inscricaoId, expiresAt])
+  @@index([eventoId])
+  @@map("reservas_pix")
+}
+
+// Snapshot antes de cancelar um pagamento; independente da inscrição e retomável em MyISAM.
+model PagamentoCancelado {
+  id String @id @default(cuid()) @db.VarChar(25)
+  inscricaoOriginalId String @db.VarChar(25)
+  eventoId String @db.VarChar(25)
+  alunoId String @db.VarChar(36)
+  alunoNome String @db.VarChar(120)
+  valorReferencia Decimal? @db.Decimal(10, 2)
+  valorPago Decimal? @db.Decimal(10, 2)
+  valorDesconto Decimal? @db.Decimal(10, 2)
+  situacaoFinanceira String? @db.VarChar(20)
+  dataPagamento DateTime?
+  dataTransferencia DateTime?
+  reservaPixId String? @db.VarChar(25)
+  aprovadoPor String? @db.VarChar(25)
+  observacaoFinanceira String? @db.VarChar(500)
+  canceladoPor String @db.VarChar(25)
+  motivo String? @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  @@unique([inscricaoOriginalId, dataPagamento])
+  @@index([eventoId])
+  @@map("pagamentos_cancelados")
 }

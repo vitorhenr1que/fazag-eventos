@@ -151,16 +151,17 @@ Os filtros afetam o detalhamento e sua exportação; os indicadores sempre repre
 
 Em `/admin/inscricoes/pendentes`:
 
-- **Aprovar** confirma o pagamento integral do valor de referência da inscrição.
+- **Aprovar** abre a conferência de reserva, valor recebido e horário da transferência. Pagamento integral exige correspondência com a referência reconhecida.
 - **Desconto** permite informar o valor efetivamente recebido e confirmar o pagamento.
 - **Isenção** confirma sem recebimento e registra o valor dispensado.
 
-Novas inscrições preservam o preço vigente na inscrição. Mudanças posteriores no preço do evento
-não alteram esses valores nem os pagamentos já aprovados. Pendências anteriores à atualização,
-sem referência histórica, usam o preço vigente na aprovação. Aprovações anteriores sem registro
+Novas inscrições pagas não congelam o preço. Uma reserva Pix garante o valor durante 30 minutos,
+reconhecido pelo horário efetivo da transferência no comprovante, mesmo com aprovação posterior.
+Sem reserva correspondente, a conferência manual usa o preço atual; referências antigas de pendentes
+não garantem lotes anteriores. Ajustes financeiros explícitos e pagamentos já aprovados são preservados. Aprovações anteriores sem registro
 financeiro aparecem explicitamente como **Sem registro financeiro** e não são estimadas como receita.
-O valor a receber é uma estimativa antes de eventuais descontos ou isenções; para pendências
-antigas sem valor registrado, essa estimativa usa o preço atual do evento.
+O valor a receber estima as pendências pelo preço atual, preservando ajustes financeiros explícitos.
+Reservas só determinam a referência definitiva após conferência do comprovante.
 
 Para instalar em um banco com histórico de migrações atualizado:
 
@@ -181,8 +182,8 @@ Para validar cálculos financeiros e exportação:
 node --test tests/*.test.cjs
 ```
 
-No detalhamento do relatório, **Cancelar pagamento** limpa o pagamento ou isenção, mantém o valor
-de referência e devolve a inscrição a Pendentes. Essa ação não é contabilizada como reembolso.
+No detalhamento do relatório, **Cancelar pagamento** arquiva a conferência original, invalida reservas
+anteriores, limpa pagamento e referência e devolve a inscrição a Pendentes pelo preço atual. Essa ação não é contabilizada como reembolso.
 **Reembolsar** registra a devolução integral do valor recebido e exclui a inscrição e seus vínculos
 (atividades escolhidas, presenças e certificado). O cadastro do aluno permanece.
 O histórico de reembolsos é independente da inscrição e preserva nome, valor original, data,
@@ -222,3 +223,10 @@ Para permitir o upload direto de banners do navegador para o R2, você deve conf
 ]
 ```
 *(Nota: Certifique-se de incluir o domínio administrativo se for diferente dos listados).*
+
+## Reservas de preço Pix
+
+A API do aluno reserva o preço Pix por 30 minutos no servidor. A conferência manual
+em Pendentes registra a reserva, o recebido e o horário efetivo do comprovante,
+separadamente do horário da aprovação. Consulte [o contrato e a migração](docs/reservas-pix.md)
+para integrar o aplicativo, aplicar a migração e verificar o histórico financeiro.

@@ -92,19 +92,8 @@ export default function InscricoesEventoPage() {
 
     const [emittingId, setEmittingId] = useState<string | null>(null)
 
-    async function handleAprovarPagamento(inscricaoId: string) {
-        try {
-            const res = await apiFetch(`/api/admin/inscricoes/${inscricaoId}/aprovar`, {
-                method: 'POST',
-                isAdmin: true
-            })
-            if (res.ok) {
-                toast.success('Pagamento aprovado!')
-                setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, status: 'CONFIRMADA' } : i))
-            }
-        } catch (err) {
-            toast.error('Erro ao aprovar pagamento')
-        }
+    function handleAprovarPagamento(inscricaoId: string) {
+        window.location.assign(`/admin/inscricoes/pendentes?inscricaoId=${encodeURIComponent(inscricaoId)}`)
     }
 
     async function handleEmitirCertificado(inscricaoId: string, atualCarga?: number) {

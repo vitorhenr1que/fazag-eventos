@@ -2,8 +2,8 @@ import prisma from '@/lib/db'
 import { InscricaoRepository } from '@/repositories/inscricao.repository'
 import { EventoRepository } from '@/repositories/evento.repository'
 import { AppError } from '@/lib/app-error'
-import { Prisma } from '@prisma/client'
-import { calcularPagamento, type AprovacaoFinanceira } from '@/lib/financeiro'
+import { comLockFinanceiro } from '@/lib/financeiro-lock'
+import { calcularPagamento, reconhecerReferencia, type AprovacaoFinanceira } from '@/lib/financeiro'
 
 const inscricaoRepo = new InscricaoRepository()
 const eventoRepo = new EventoRepository()
@@ -33,7 +33,7 @@ export class InscricaoService {
             aluno: { connect: { id: alunoId } },
             evento: { connect: { id: eventoId } },
             status,
-            valorReferencia: evento.tipo === 'PAGO' ? evento.preco : 0,
+            valorReferencia: evento.tipo === 'PAGO' ? null : 0,
             situacaoFinanceira: evento.tipo === 'PAGO' ? 'PENDENTE' : 'GRATUITO',
             valorPago: evento.tipo === 'PAGO' ? null : 0,
             valorDesconto: evento.tipo === 'PAGO' ? null : 0,
@@ -316,36 +316,31 @@ export class InscricaoService {
     }
 
     async aprovarInscricao(inscricaoId: string, dados: AprovacaoFinanceira, adminId: string) {
-        return prisma.$transaction(async tx => {
+        const inicial = await prisma.inscricao.findUnique({ where: { id: inscricaoId } })
+        if (!inicial) throw new AppError('Inscrição não encontrada', 404)
+        return comLockFinanceiro(inicial.eventoId, async tx => {
             const inscricao = await tx.inscricao.findUnique({ where: { id: inscricaoId }, include: { evento: true } })
             if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
-            // O banco existente também usa MyISAM: FOR UPDATE não protege essas tabelas.
-            // GET_LOCK serializa aprovações na conexão reservada pela transação em ambos os engines.
-            const lockName = `financeiro:${inscricao.eventoId}`
-            const locks = await tx.$queryRaw<{ adquirido: number | bigint | null }[]>`SELECT GET_LOCK(${lockName}, 10) AS adquirido`
-            if (Number(locks[0]?.adquirido) !== 1) throw new AppError('Outra aprovação está em andamento. Tente novamente.', 409)
-            try {
-                if (inscricao.status !== 'PENDENTE') throw new AppError('Esta inscrição não está pendente de aprovação', 409)
-                const reembolso = await tx.reembolso.findUnique({ where: { inscricaoOriginalId: inscricaoId } })
-                if (reembolso) throw new AppError('Esta inscrição possui um reembolso registrado', 409)
-                if (await tx.exclusaoInscricao.findUnique({ where: { inscricaoOriginalId: inscricaoId } })) throw new AppError('Esta inscrição possui uma exclusão em andamento', 409)
-                const ocupadas = await tx.inscricao.count({ where: { eventoId: inscricao.eventoId, status: 'CONFIRMADA' } })
-                if (ocupadas >= inscricao.evento.totalVagas) throw new AppError('Não é possível aprovar: Vagas esgotadas para este evento')
-                const referencia = inscricao.valorReferencia ?? inscricao.evento.preco
-                if (referencia === null) throw new AppError('Defina o valor do evento antes de aprovar')
-                const pagamento = calcularPagamento(Number(referencia), dados)
-                const result = await tx.inscricao.updateMany({
-                    where: { id: inscricaoId, status: 'PENDENTE' },
-                    data: {
-                        status: 'CONFIRMADA', valorReferencia: referencia, ...pagamento,
-                        dataPagamento: new Date(), aprovadoPor: adminId, observacaoFinanceira: dados.observacao || null,
-                    },
-                })
-                if (result.count !== 1) throw new AppError('Esta inscrição já foi aprovada', 409)
-                return await tx.inscricao.findUnique({ where: { id: inscricaoId } })
-            } finally {
-                await tx.$queryRaw`SELECT RELEASE_LOCK(${lockName})`
-            }
-        }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 20000 })
+            if (inscricao.status !== 'PENDENTE') throw new AppError('Esta inscrição não está pendente de aprovação', 409)
+            const reembolso = await tx.reembolso.findUnique({ where: { inscricaoOriginalId: inscricaoId } })
+            if (reembolso) throw new AppError('Esta inscrição possui um reembolso registrado', 409)
+            if (await tx.exclusaoInscricao.findUnique({ where: { inscricaoOriginalId: inscricaoId } })) throw new AppError('Esta inscrição possui uma exclusão em andamento', 409)
+            const ocupadas = await tx.inscricao.count({ where: { eventoId: inscricao.eventoId, status: 'CONFIRMADA' } })
+            if (ocupadas >= inscricao.evento.totalVagas) throw new AppError('Não é possível aprovar: Vagas esgotadas para este evento')
+            const reserva = dados.quoteId ? await tx.reservaPix.findUnique({ where: { id: dados.quoteId } }) : null
+            if (dados.quoteId && (!reserva || reserva.inscricaoId !== inscricaoId)) throw new AppError('Reserva não pertence a esta inscrição', 400, 'PIX_RESERVA_INVALIDA')
+            const { referencia, transferencia } = reconhecerReferencia(inscricao, reserva, dados)
+            const pagamento = calcularPagamento(Number(referencia), dados)
+            const result = await tx.inscricao.updateMany({
+                where: { id: inscricaoId, status: 'PENDENTE' },
+                data: {
+                    status: 'CONFIRMADA', valorReferencia: referencia, ...pagamento,
+                    dataTransferencia: transferencia, reservaPixId: reserva?.id ?? null,
+                    dataPagamento: new Date(), aprovadoPor: adminId, observacaoFinanceira: dados.observacao || null,
+                },
+            })
+            if (result.count !== 1) throw new AppError('Esta inscrição já foi aprovada', 409)
+            return await tx.inscricao.findUnique({ where: { id: inscricaoId } })
+        })
     }
 }

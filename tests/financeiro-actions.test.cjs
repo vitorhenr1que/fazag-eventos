@@ -16,6 +16,8 @@ function ambiente(overrides = {}, falharUmaVez = false) {
         reembolso: null, subeventos: [{ id: 'sub-1' }], checkins: ['check-1'], certificados: ['cert-1'],
     }
     const db = {
+        pagamentoCancelado: { upsert: async ({ create }) => { state.cancelado = create } },
+        reservaPix: { updateMany: async () => { state.reservasInvalidadas = true } },
         exclusaoInscricao: { findUnique: async () => null },
         inscricao: {
             findUnique: async () => state.inscricao,
@@ -47,6 +49,7 @@ function ambiente(overrides = {}, falharUmaVez = false) {
     loaded.filename = filename; loaded.paths = module.paths
     const originalRequire = loaded.require.bind(loaded)
     loaded.require = id => {
+        if (id === '@/lib/financeiro-lock') return require('./helpers/load-lock.cjs')(db)
         if (id === '@/lib/db') return { __esModule: true, default: db }
         if (id === '@/lib/app-error') return require('../src/lib/app-error.ts')
         if (id === '@/lib/financeiro') return require('../src/lib/financeiro.ts')
@@ -74,12 +77,14 @@ test('reembolso arquiva o valor pago com desconto, exclui vínculos e inscriçã
     assert.equal(state.reembolso.reembolsadoPor, 'admin-reembolso')
 })
 
-test('cancelamento limpa aprovação e pagamento, mantém inscrição e referência sem criar reembolso', async () => {
+test('cancelamento arquiva aprovação, invalida reservas e limpa pagamento sem criar reembolso', async () => {
     const { state, service } = ambiente()
     await service.realizarAcao('inscricao-1', { acao: 'CANCELAMENTO' }, 'admin-1')
     assert.equal(state.inscricao.status, 'PENDENTE')
     assert.equal(state.inscricao.situacaoFinanceira, 'PENDENTE')
-    assert.equal(state.inscricao.valorReferencia, 30)
+    assert.equal(state.inscricao.valorReferencia, null)
+    assert.equal(state.cancelado.valorReferencia, 30)
+    assert.equal(state.reservasInvalidadas, true)
     for (const field of ['valorPago', 'valorDesconto', 'dataPagamento', 'aprovadoPor', 'observacaoFinanceira']) assert.equal(state.inscricao[field], null)
     assert.equal(state.reembolso, null)
     assert.equal(state.subeventos.length, 1)

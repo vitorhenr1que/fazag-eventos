@@ -29,6 +29,7 @@ function ambiente(overrides = {}) {
     loaded.filename = filename; loaded.paths = module.paths
     const original = loaded.require.bind(loaded)
     loaded.require = id => {
+        if (id === '@/lib/financeiro-lock') return require('./helpers/load-lock.cjs')(db)
         if (id === '@/lib/db') return { __esModule: true, default: db }
         if (id === '@/lib/app-error') return require('../src/lib/app-error.ts')
         if (id === './financeiro.service') return { FinanceiroService: class { async realizarAcao(...args) { state.refundCalls.push(args); return { acao: 'REEMBOLSO' } } } }

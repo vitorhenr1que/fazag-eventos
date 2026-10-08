@@ -6,6 +6,8 @@ export interface RegistroFinanceiro {
     valorPago: string | number | null
     valorDesconto: string | number | null
     dataInscricao: string
+    reservaPixId?: string | null
+    dataTransferencia?: string | null
     dataPagamento: string | null
     responsavel: string | null
     observacaoFinanceira: string | null
@@ -25,8 +27,11 @@ export interface RegistroReembolso {
     valorDesconto: string | number | null
     modalidadeOriginal: string
     dataReembolso: string
+    reservaPixId?: string | null
+    dataTransferencia?: string | null
     dataPagamento: string | null
     estado: string
+    responsavel?: string | null
     responsavelReembolso: string | null
     motivo: string | null
 }
@@ -64,7 +69,7 @@ export function resumirFinanceiro(registros: RegistroFinanceiro[], precoAtual: n
         else if (situacao === 'PENDENTE') {
             resumo.pendentes++
             if (registro.valorReferencia === null) resumo.pendentesSemValor++
-            resumo.aReceber += Math.round(Number(registro.valorReferencia ?? precoAtual) * 100)
+            resumo.aReceber += Math.round(Number(['DESCONTO', 'ISENTO'].includes(registro.situacaoFinanceira ?? '') ? registro.valorReferencia ?? precoAtual : precoAtual) * 100)
         } else resumo.semRegistro++
     }
     let reembolsado = 0

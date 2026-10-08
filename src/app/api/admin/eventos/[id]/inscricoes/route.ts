@@ -27,7 +27,7 @@ export async function GET(
         })
 
         const data = hasAdminPermission(admin.role, 'FINANCEIRO') ? inscricoes : inscricoes.map(inscricao => {
-            const { valorReferencia, valorPago, valorDesconto, situacaoFinanceira, dataPagamento, aprovadoPor, observacaoFinanceira, ...operacional } = inscricao
+            const { valorReferencia, valorPago, valorDesconto, situacaoFinanceira, dataPagamento, dataTransferencia, reservaPixId, aprovadoPor, observacaoFinanceira, ...operacional } = inscricao
             return operacional
         })
         const exclusoesEmProcessamento = hasAdminPermission(admin.role, 'ADMINISTRADOR')
