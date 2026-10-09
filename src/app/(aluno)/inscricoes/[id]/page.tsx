@@ -8,8 +8,9 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { formatDate } from '@/lib/utils'
-import { Clock, CheckCircle, Loader2, CreditCard } from 'lucide-react'
+import { CheckCircle, Loader2, CreditCard } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { InscricaoEmAnalise } from '@/components/inscricoes/InscricaoEmAnalise'
 
 export default function GerenciarInscricaoPage() {
     const params = useParams()
@@ -131,33 +132,7 @@ export default function GerenciarInscricaoPage() {
     if (!loading && !data) return <div className="container py-12 text-center">Inscrição não encontrada</div>
 
     if (!loading && data.status === 'PENDENTE') {
-        const { evento } = data
-        return (
-            <div className="container py-12 max-w-2xl mx-auto text-center space-y-6">
-                <Card className="p-8 border-amber-200 bg-amber-50/50 shadow-sm">
-                    <div className="flex justify-center mb-4">
-                        <div className="p-3 bg-amber-100 rounded-full text-amber-600">
-                            <Clock size={48} />
-                        </div>
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-800">Inscrição em Análise</h1>
-                    <p className="text-slate-600 mt-4">
-                        Sua solicitação de inscrição para <strong>{evento.nome}</strong> foi recebida com sucesso.
-                    </p>
-                    <div className="bg-white p-4 rounded-lg border border-amber-100 mt-6 text-left text-sm text-slate-500">
-                        <p className="font-semibold text-slate-700 mb-2">Próximos Passos:</p>
-                        <ul className="list-disc ml-4 space-y-1">
-                            <li>Realize o pagamento conforme as instruções da instituição.</li>
-                            <li>O administrador irá validar seu pagamento no painel.</li>
-                            <li>Após a aprovação, você poderá retornar aqui para escolher seus workshops e palestras.</li>
-                        </ul>
-                    </div>
-                    <Button asChild className="mt-8 w-full md:w-auto">
-                        <Link href="/minhas-inscricoes">Ir para Minhas Inscrições</Link>
-                    </Button>
-                </Card>
-            </div>
-        )
+        return <InscricaoEmAnalise key={data.id} inscricaoId={data.id} evento={data.evento} />
     }
 
     const { evento } = data || {}
