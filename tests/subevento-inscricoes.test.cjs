@@ -212,6 +212,33 @@ test('admin e aluno disputando a última vaga não excedem a capacidade', async 
     assert.equal(a.vinculos.length, 1)
 })
 
+test('contrato dos apps mantém payload, header e resposta anteriores, sem campos novos obrigatórios', async () => {
+    const a = ambiente()
+    const enviar = body => a.aluno(new Request('http://localhost/api/inscricoes/insc-1/subeventos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-aluno-id': 'aluno-1' },
+        body: JSON.stringify(body),
+    }), { params: Promise.resolve({ inscricaoId: 'insc-1' }) })
+
+    let response = await enviar({ subeventoIds: ['sub-1'] })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { success: true, data: { success: true, added: 1, removed: 0 } })
+
+    response = await enviar({ subeventoIds: ['sub-1', 'sub-2'] })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { success: true, data: { success: true, added: 1, removed: 0 } })
+
+    response = await enviar({ subeventoIds: ['sub-1', 'sub-2'] })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { success: true, data: { success: true, added: 0, removed: 0 } })
+    assert.equal(a.vinculos.length, 2)
+
+    // Campos adicionais continuam sendo ignorados como no schema anterior.
+    response = await enviar({ subeventoIds: ['sub-1', 'sub-2'], appVersion: '1.0', alunoId: 'valor-ignorado' })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { success: true, data: { success: true, added: 0, removed: 0 } })
+})
+
 test('seleção pelo aluno valida propriedade e relê escolhas feitas pelo administrador', async () => {
     const a = ambiente()
     assert.equal((await selecionar(a, 'insc-1', 'aluno-2', ['sub-1'])).status, 403)

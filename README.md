@@ -235,6 +235,29 @@ principal, o pagamento e certificados já emitidos são preservados.
 As inclusões, seleções dos alunos, presenças e exclusões usam o mesmo lock por evento
 para coordenar alterações simultâneas. Não há migração de banco para essa funcionalidade.
 
+### Compatibilidade com os aplicativos existentes
+
+A seleção pelo aluno mantém o contrato anterior:
+
+```http
+POST /api/inscricoes/{inscricaoId}/subeventos
+Content-Type: application/json
+x-aluno-id: MATRICULA_DO_ALUNO
+
+{"subeventoIds":["ID_DO_SUBEVENTO"]}
+```
+
+Resposta de sucesso (HTTP 200):
+
+```json
+{"success":true,"data":{"success":true,"added":1,"removed":0}}
+```
+
+`added` informa quantos vínculos foram criados e `removed` permanece zero na seleção
+do aluno. O corpo deve incluir também os subeventos já selecionados, como antes.
+Não é necessário adicionar `alunoId` ou `inscricaoId` ao JSON, nem enviar token de
+administrador. As novas rotas administrativas são usadas somente pelo painel.
+
 ## Reservas de preço Pix
 
 A API do aluno reserva o preço Pix por 30 minutos no servidor. A conferência manual
