@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft, Plus, Trash2, Edit2, Save, X } from 'lucide-react'
+import { Loader2, ArrowLeft, Plus, Trash2, Edit2, Save, X, Users } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, formatForInput } from '@/lib/utils'
 
@@ -16,6 +16,7 @@ export default function GerenciarSubeventosPage() {
     const [subeventos, setSubeventos] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [erro, setErro] = useState('')
 
     // Estado para o formulário (Novo ou Edição)
     const [showForm, setShowForm] = useState(false)
@@ -30,21 +31,23 @@ export default function GerenciarSubeventosPage() {
         cargaHoraria: 1 // em horas
     })
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const res = await apiFetch(`/api/eventos/${params.id}`)
-                if (res.ok) {
-                    const json = await res.json()
-                    setEvento(json.data)
-                    setSubeventos(json.data.subeventos || [])
-                }
-            } finally {
-                setLoading(false)
-            }
-        }
-        load()
+    const load = useCallback(async (signal?: AbortSignal) => {
+        const res = await apiFetch(`/api/admin/eventos/${params.id}/subeventos`, { isAdmin: true, signal })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error?.message || 'Erro ao carregar subeventos')
+        if (signal?.aborted) return
+        setEvento(json.data)
+        setSubeventos(json.data.subeventos || [])
+        setErro('')
     }, [params.id])
+
+    useEffect(() => {
+        const controller = new AbortController()
+        load(controller.signal)
+            .catch(error => { if (!controller.signal.aborted) setErro(error instanceof Error ? error.message : 'Erro de conexão') })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+        return () => controller.abort()
+    }, [load])
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -83,9 +86,7 @@ export default function GerenciarSubeventosPage() {
             if (res.ok) {
                 toast.success(editingId ? 'Subevento atualizado!' : 'Subevento criado!')
                 // Recarregar lista
-                const freshRes = await apiFetch(`/api/eventos/${params.id}`)
-                const freshJson = await freshRes.json()
-                setSubeventos(freshJson.data.subeventos || [])
+                await load()
 
                 resetForm()
             } else {
@@ -148,6 +149,10 @@ export default function GerenciarSubeventosPage() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
+            {erro && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                {erro}
+                <Button variant="link" onClick={() => load().catch(error => setErro(error.message))}>Tentar novamente</Button>
+            </div>}
             <div className="flex items-center justify-between">
                 <div>
                     <div className="flex gap-4 mb-2">
@@ -228,10 +233,10 @@ export default function GerenciarSubeventosPage() {
             <div className="grid gap-4">
                 {subeventos.map(sub => (
                     <Card key={sub.id} className="hover:shadow-md transition group">
-                        <CardContent className="p-4 flex items-center justify-between">
-                            <div className="flex-1">
+                        <CardContent className="p-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex-1 min-w-0">
                                 <h3 className="font-bold text-slate-800">{sub.nome}</h3>
-                                <div className="flex gap-4 text-xs text-slate-500 mt-1">
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
                                     <span>{formatDate(sub.dataInicio, 'dd/MM HH:mm')} - {formatDate(sub.dataFim, 'HH:mm')}</span>
                                     <span>•</span>
                                     <span>{sub.local || 'Local não definido'}</span>
@@ -243,11 +248,16 @@ export default function GerenciarSubeventosPage() {
                                     <span className="font-semibold text-primary">{sub.cargaHoraria}h</span>
                                 </div>
                             </div>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                                <Button variant="outline" size="sm" onClick={() => startEdit(sub)}>
+                            <div className="flex gap-2 shrink-0">
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/admin/eventos/${params.id}/subeventos/${sub.id}/inscricoes`}>
+                                        <Users size={14} className="mr-2" /> Inscritos
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" size="sm" aria-label={`Editar ${sub.nome}`} onClick={() => startEdit(sub)}>
                                     <Edit2 size={14} />
                                 </Button>
-                                <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(sub.id)}>
+                                <Button variant="outline" size="sm" aria-label={`Excluir ${sub.nome}`} className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(sub.id)}>
                                     < Trash2 size={14} />
                                 </Button>
                             </div>
@@ -255,7 +265,7 @@ export default function GerenciarSubeventosPage() {
                     </Card>
                 ))}
 
-                {subeventos.length === 0 && !showForm && (
+                {subeventos.length === 0 && !showForm && !erro && (
                     <div className="p-12 text-center border-2 border-dashed rounded-xl bg-slate-50">
                         <p className="text-slate-400">Nenhum subevento cadastrado.</p>
                         <Button variant="link" onClick={() => setShowForm(true)}>Clique aqui para adicionar o primeiro</Button>

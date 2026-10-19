@@ -17,12 +17,11 @@ export async function POST(
         const { inscricaoId } = await params
         // Validar aluno 
         const aluno = await getAlunoFromHeader(request)
-        // Opcional: Validar se a inscrição pertence ao aluno (Service ou Repo deve checar)
 
         const body = await request.json()
         const { subeventoIds } = bodySchema.parse(body)
 
-        const result = await inscricaoService.selecionarSubeventos(inscricaoId, subeventoIds)
+        const result = await inscricaoService.selecionarSubeventos(inscricaoId, subeventoIds, aluno.id)
 
         return NextResponse.json({ success: true, data: result })
     } catch (error) {

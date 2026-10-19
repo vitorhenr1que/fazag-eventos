@@ -40,11 +40,18 @@ export class InscricaoService {
         } as any)
     }
 
-    async selecionarSubeventos(inscricaoId: string, subeventoIds: string[]) {
-        // Transação para garantir consistência
-        return prisma.$transaction(async (tx) => {
-            const inscricao = await inscricaoRepo.findById(inscricaoId) as any
+    async selecionarSubeventos(inscricaoId: string, subeventoIds: string[], alunoId: string) {
+        const inicial = await prisma.inscricao.findUnique({ where: { id: inscricaoId }, select: { eventoId: true, alunoId: true } })
+        if (!inicial) throw new AppError('Inscrição não encontrada', 404)
+        if (inicial.alunoId !== alunoId) throw new AppError('Acesso negado', 403)
+        return comLockFinanceiro(inicial.eventoId, async (tx) => {
+            const inscricao = await tx.inscricao.findUnique({ where: { id: inscricaoId }, include: { evento: { include: { subeventos: true } }, subeventosEscolhidos: { include: { subevento: true } } } })
             if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
+            if (inscricao.alunoId !== alunoId) throw new AppError('Acesso negado', 403)
+            if (await tx.exclusaoInscricao.findUnique({ where: { inscricaoOriginalId: inscricaoId } }) ||
+                await tx.reembolso.findUnique({ where: { inscricaoOriginalId: inscricaoId } })) {
+                throw new AppError('Esta inscrição possui uma exclusão ou reembolso registrado', 409)
+            }
 
             if (inscricao.status !== 'CONFIRMADA') {
                 throw new AppError('Sua inscrição precisa ser confirmada para selecionar subeventos', 400)
@@ -156,36 +163,40 @@ export class InscricaoService {
     }
 
     async realizarCheckInSubevento(inscricaoId: string, subeventoId: string, ignoreTimeWindow = false) {
-        const relacao = await prisma.inscricaoSubevento.findUnique({
-            where: { inscricaoId_subeventoId: { inscricaoId, subeventoId } },
-            include: { subevento: true, inscricao: { select: { status: true } } } as any
-        }) as any
+        const subevento = await prisma.subevento.findUnique({ where: { id: subeventoId }, select: { eventoId: true } })
+        if (!subevento) throw new AppError('Subevento não encontrado', 404)
+        return comLockFinanceiro(subevento.eventoId, async () => {
+            const relacao = await prisma.inscricaoSubevento.findUnique({
+                where: { inscricaoId_subeventoId: { inscricaoId, subeventoId } },
+                include: { subevento: true, inscricao: { select: { status: true } } }
+            })
 
-        if (!relacao) throw new AppError('Aluno não inscrito neste subevento', 404)
-        if (relacao.inscricao.status !== 'CONFIRMADA') throw new AppError('A inscrição precisa estar confirmada para realizar check-in')
+            if (!relacao) throw new AppError('Aluno não inscrito neste subevento', 404)
+            if (relacao.inscricao.status !== 'CONFIRMADA') throw new AppError('A inscrição precisa estar confirmada para realizar check-in')
 
-        // Validar Janela de Tempo do Subevento (Pula se for Admin/Manual)
-        if (!ignoreTimeWindow) {
-            const agora = new Date()
-            const inicio = new Date(relacao.subevento.dataInicio)
+            // Validar Janela de Tempo do Subevento (Pula se for Admin/Manual)
+            if (!ignoreTimeWindow) {
+                const agora = new Date()
+                const inicio = new Date(relacao.subevento.dataInicio)
 
-            const trintaMinAntes = new Date(inicio.getTime() - 30 * 60000)
-            const umaHoraETreintaDepois = new Date(inicio.getTime() + 90 * 60000)
+                const trintaMinAntes = new Date(inicio.getTime() - 30 * 60000)
+                const umaHoraETreintaDepois = new Date(inicio.getTime() + 90 * 60000)
 
-            if (agora < trintaMinAntes) {
-                throw new AppError(`Check-in para "${relacao.subevento.nome}" ainda não disponível.`)
+                if (agora < trintaMinAntes) {
+                    throw new AppError(`Check-in para "${relacao.subevento.nome}" ainda não disponível.`)
+                }
+                if (agora > umaHoraETreintaDepois) {
+                    throw new AppError(`Período de check-in para "${relacao.subevento.nome}" encerrado.`)
+                }
             }
-            if (agora > umaHoraETreintaDepois) {
-                throw new AppError(`Período de check-in para "${relacao.subevento.nome}" encerrado.`)
-            }
-        }
 
-        try {
-            return await inscricaoRepo.checkInSubevento(relacao.id)
-        } catch (e: any) {
-            if (e.code === 'P2002') return { message: 'Check-in já realizado' }
-            throw e
-        }
+            try {
+                return await inscricaoRepo.checkInSubevento(relacao.id)
+            } catch (e: any) {
+                if (e.code === 'P2002') return { message: 'Check-in já realizado' }
+                throw e
+            }
+        })
     }
 
     async emitirCertificado(inscricaoId: string) {

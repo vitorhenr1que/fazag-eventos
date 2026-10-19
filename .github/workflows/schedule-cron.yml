@@ -6,11 +6,27 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch: # Permite rodar manualmente pelo painel do GitHub
 
+permissions: {}
+
+concurrency:
+  group: expire-eventos
+  cancel-in-progress: false
+
 jobs:
   expire_eventos:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
       - name: Chamada da API de Expiração
+        env:
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
         run: |
-          curl -X GET "https://eventos.fazag.edu.br/api/internal/jobs/expire-eventos" \
-          -H "x-job-secret: ${{ secrets.JOB_SECRET }}"
+          if [ -z "$JOB_SECRET" ]; then
+            echo "::error::O secret JOB_SECRET não está configurado no GitHub Actions."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 120 \
+            "https://eventos.fazag.edu.br/api/internal/jobs/expire-eventos" \
+            -H "x-job-secret: $JOB_SECRET"

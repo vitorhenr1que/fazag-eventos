@@ -2,12 +2,14 @@ import { ALUNO_CONFIG } from './aluno-config'
 
 type FetchOptions = RequestInit & {
     isAdmin?: boolean
+    redirectOnUnauthorized?: boolean
 }
 
 export async function apiFetch(url: string, options: FetchOptions = {}) {
-    const headers = new Headers(options.headers)
+    const { isAdmin, redirectOnUnauthorized = true, ...fetchOptions } = options
+    const headers = new Headers(fetchOptions.headers)
 
-    if (options.isAdmin) {
+    if (isAdmin) {
         // Pegar token do localStorage ou cookie
         const token = typeof window !== 'undefined' ? localStorage.getItem('admin-token') : ''
         if (token) {
@@ -29,13 +31,14 @@ export async function apiFetch(url: string, options: FetchOptions = {}) {
     }
 
     const response = await fetch(url, {
-        ...options,
+        ...fetchOptions,
         headers
     })
 
     // Tratamento global de erro 401
     if (response.status === 401) {
-        if (options.isAdmin && typeof window !== 'undefined') {
+        if (isAdmin && redirectOnUnauthorized && typeof window !== 'undefined') {
+            localStorage.removeItem('admin-token')
             window.location.href = '/admin/login' // Redirecionar admin deslogado
         }
         // Aluno 401: Talvez header invalido ou expirado, tratar na UI

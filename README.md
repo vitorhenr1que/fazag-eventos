@@ -224,6 +224,17 @@ Para permitir o upload direto de banners do navegador para o R2, você deve conf
 ```
 *(Nota: Certifique-se de incluir o domínio administrativo se for diferente dos listados).*
 
+## Inscritos por subevento
+
+Em `/admin/eventos/[id]/subeventos`, o botão **Inscritos** abre os alunos de cada
+atividade, com busca por nome, matrícula ou e-mail e indicação de presença.
+Administradores e NUPPEX podem adicionar alunos com inscrição confirmada no evento
+principal, respeitando as vagas e o limite de subeventos por aluno, e remover alunos
+da atividade. A remoção também apaga a presença daquele subevento; a inscrição
+principal, o pagamento e certificados já emitidos são preservados.
+As inclusões, seleções dos alunos, presenças e exclusões usam o mesmo lock por evento
+para coordenar alterações simultâneas. Não há migração de banco para essa funcionalidade.
+
 ## Reservas de preço Pix
 
 A API do aluno reserva o preço Pix por 30 minutos no servidor. A conferência manual

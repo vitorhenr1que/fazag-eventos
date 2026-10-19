@@ -21,7 +21,8 @@ export default function AdminLoginPage() {
             const res = await apiFetch('/api/admin/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, senha }),
-                isAdmin: true // Mesmo nao tendo token ainda, flag para comportamento futuro
+                isAdmin: true,
+                redirectOnUnauthorized: false
             })
             const json = await res.json()
 
