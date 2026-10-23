@@ -19,14 +19,29 @@ export async function GET(
                 certificado: true,
                 subeventosEscolhidos: {
                     include: {
-                        subevento: true,
                         checkIn: true
                     }
                 }
-            } as any
+            },
+            orderBy: [{ dataInscricao: 'asc' }, { id: 'asc' }],
         })
 
-        const data = hasAdminPermission(admin.role, 'FINANCEIRO') ? inscricoes : inscricoes.map(inscricao => {
+        // Vínculos antigos podem apontar para subeventos removidos no banco legado.
+        // Buscar separadamente evita que um vínculo órfão impeça listar todos os alunos.
+        const subeventoIds = Array.from(new Set(inscricoes.flatMap(i => i.subeventosEscolhidos.map(se => se.subeventoId))))
+        const subeventos = subeventoIds.length
+            ? await prisma.subevento.findMany({ where: { id: { in: subeventoIds }, eventoId: id } })
+            : []
+        const subeventosPorId = new Map(subeventos.map(s => [s.id, s]))
+        const inscricoesComSubeventos = inscricoes.map(inscricao => ({
+            ...inscricao,
+            subeventosEscolhidos: inscricao.subeventosEscolhidos.flatMap(se => {
+                const subevento = subeventosPorId.get(se.subeventoId)
+                return subevento ? [{ ...se, subevento }] : []
+            }),
+        }))
+
+        const data = hasAdminPermission(admin.role, 'FINANCEIRO') ? inscricoesComSubeventos : inscricoesComSubeventos.map(inscricao => {
             const { valorReferencia, valorPago, valorDesconto, situacaoFinanceira, dataPagamento, dataTransferencia, reservaPixId, aprovadoPor, observacaoFinanceira, ...operacional } = inscricao
             return operacional
         })

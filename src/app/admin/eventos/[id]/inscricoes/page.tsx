@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft, CheckCircle, CreditCard, Check, FileText, Download, Trash2 } from 'lucide-react'
@@ -15,15 +16,22 @@ import { hasAdminPermission } from '@/lib/admin-permissions'
 import { ExcluirInscricaoDialog, type AlvoExclusao } from '@/components/admin/ExcluirInscricaoDialog'
 import { Paginacao, ITENS_POR_PAGINA } from '@/components/admin/Paginacao'
 
+const normalizarNome = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
+
 export default function InscricoesEventoPage() {
     const session = useAdminSession()
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
     const [inscricoes, setInscricoes] = useState<any[]>([])
+    const [busca, setBusca] = useState('')
     const [pagina, setPagina] = useState(1)
-    const paginaAtual = Math.min(pagina, Math.max(1, Math.ceil(inscricoes.length / ITENS_POR_PAGINA)))
-    const inscricoesPaginadas = inscricoes.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
+    const termoBusca = normalizarNome(busca)
+    const inscricoesFiltradas = inscricoes.filter(insc => normalizarNome(insc.aluno.nome).includes(termoBusca))
+    const paginaAtual = Math.min(pagina, Math.max(1, Math.ceil(inscricoesFiltradas.length / ITENS_POR_PAGINA)))
+    const inscricoesPaginadas = inscricoesFiltradas.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
     const [loading, setLoading] = useState(true)
+    const [erro, setErro] = useState('')
+    const [tentativa, setTentativa] = useState(0)
     const [exporting, setExporting] = useState<string | null>(null)
     const [alvoExclusao, setAlvoExclusao] = useState<AlvoExclusao | null>(null)
     const [exclusoes, setExclusoes] = useState<{ inscricaoOriginalId: string; alunoNome: string; modalidade: string }[]>([])
@@ -36,29 +44,37 @@ export default function InscricoesEventoPage() {
     }
 
     useEffect(() => {
+        let ativo = true
         setPagina(1)
+        setLoading(true)
+        setErro('')
+        setEvento(null)
+        setInscricoes([])
+        setExclusoes([])
         async function load() {
             try {
-                // Buscar detalhes do evento
-                const evRes = await apiFetch(`/api/eventos/${params.id}`)
-                if (evRes.ok) {
-                    const evJson = await evRes.json()
+                const [evRes, res] = await Promise.all([
+                    apiFetch(`/api/eventos/${params.id}`),
+                    apiFetch(`/api/admin/eventos/${params.id}/inscricoes`, { isAdmin: true }),
+                ])
+                const [evJson, json] = await Promise.all([evRes.json(), res.json()])
+                if (!evRes.ok) throw new Error(evJson.error?.message || (typeof evJson.error === 'string' ? evJson.error : 'Não foi possível carregar o evento'))
+                if (!res.ok) throw new Error(json.error?.message || 'Não foi possível carregar as inscrições')
+                if (!Array.isArray(json.data)) throw new Error('Resposta inválida ao carregar as inscrições')
+                if (ativo) {
                     setEvento(evJson.data)
-                }
-
-                // Buscar inscrições (Admin)
-                const res = await apiFetch(`/api/admin/eventos/${params.id}/inscricoes`, { isAdmin: true })
-                if (res.ok) {
-                    const json = await res.json()
                     setInscricoes(json.data)
                     setExclusoes(json.exclusoesEmProcessamento ?? [])
                 }
+            } catch (error) {
+                if (ativo) setErro(error instanceof Error ? error.message : 'Não foi possível carregar as inscrições. Verifique sua conexão.')
             } finally {
-                setLoading(false)
+                if (ativo) setLoading(false)
             }
         }
         load()
-    }, [params.id])
+        return () => { ativo = false }
+    }, [params.id, tentativa])
 
     async function handleCheckInSub(inscricaoId: string, subeventoId: string) {
         try {
@@ -461,11 +477,11 @@ export default function InscricoesEventoPage() {
                     )}
                     {loading ? (
                         <Skeleton className="h-4 w-32" />
-                    ) : (
+                    ) : erro ? null : (
                         <p className="text-sm text-slate-500">Total: {inscricoes.length} inscritos</p>
                     )}
                 </div>
-                {!loading && (
+                {!loading && !erro && (
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!!exporting || inscricoes.length === 0}>
                             {exporting === 'csv' ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Download size={14} className="mr-2" />}
@@ -483,6 +499,18 @@ export default function InscricoesEventoPage() {
                 )}
             </div>
 
+            {erro && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                <p>Não foi possível exibir a lista de inscritos: {erro}</p>
+                <Button type="button" variant="outline" size="sm" onClick={() => setTentativa(valor => valor + 1)}>Tentar novamente</Button>
+            </div>}
+
+            {!erro && <>
+            <div className="max-w-md space-y-2">
+                <label htmlFor="busca-inscrito" className="block text-sm font-medium">Buscar inscrito pelo nome</label>
+                <Input id="busca-inscrito" type="search" placeholder="Digite o nome do inscrito..." value={busca}
+                    onChange={e => { setBusca(e.target.value); setPagina(1) }} />
+                {!loading && termoBusca && <p role="status" className="text-sm text-slate-500">{inscricoesFiltradas.length} inscrito(s) encontrado(s)</p>}
+            </div>
             <Card className="shadow-sm">
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
@@ -635,12 +663,12 @@ export default function InscricoesEventoPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!loading && inscricoes.length === 0 && (
+                    {!loading && inscricoesFiltradas.length === 0 && (
                         <div className="p-10 text-center text-slate-400 italic">
-                            Nenhum aluno inscrito neste evento ainda.
+                            {inscricoes.length === 0 ? 'Nenhum aluno inscrito neste evento ainda.' : 'Nenhum inscrito encontrado para esta busca.'}
                         </div>
                     )}
-                    {!loading && <Paginacao pagina={paginaAtual} total={inscricoes.length} onPaginaChange={setPagina} />}
+                    {!loading && <Paginacao pagina={paginaAtual} total={inscricoesFiltradas.length} onPaginaChange={setPagina} />}
                 </CardContent>
             </Card>
             {exclusoes.length > 0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="Exclusões em processamento">
@@ -649,6 +677,7 @@ export default function InscricoesEventoPage() {
                     <Button variant="outline" size="sm" onClick={() => setAlvoExclusao({ id: e.inscricaoOriginalId, nome: e.alunoNome, status: 'CONFIRMADA', situacaoFinanceira: null, valorPago: null, modalidadeOriginal: e.modalidade })}>Concluir exclusão</Button></div>)}
             </section>}
             {alvoExclusao && <ExcluirInscricaoDialog key={alvoExclusao.id} alvo={alvoExclusao} pago={evento?.tipo === 'PAGO' || Boolean(alvoExclusao.modalidadeOriginal)} fechar={() => setAlvoExclusao(null)} atualizar={atualizarInscricoes} />}
+            </>}
         </div>
     )
 }
