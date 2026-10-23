@@ -11,11 +11,15 @@ import { formatDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 import { hasAdminPermission } from '@/lib/admin-permissions'
+import { Paginacao, ITENS_POR_PAGINA } from '@/components/admin/Paginacao'
 
 export default function AdminEventosPage() {
     const session = useAdminSession()
     const [eventos, setEventos] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [pagina, setPagina] = useState(1)
+    const paginaAtual = Math.min(pagina, Math.max(1, Math.ceil(eventos.length / ITENS_POR_PAGINA)))
+    const eventosPaginados = eventos.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
 
     useEffect(() => {
         async function load() {
@@ -82,7 +86,7 @@ export default function AdminEventosPage() {
                                 </tr>
                             ))
                         ) : (
-                            eventos.map(e => (
+                            eventosPaginados.map(e => (
 
                                 <tr key={e.id} className="hover:bg-slate-50 transition">
                                     <td className="px-6 py-4">
@@ -128,11 +132,12 @@ export default function AdminEventosPage() {
                         )}
                     </tbody>
                 </table>
-                {eventos.length === 0 && (
+                {!loading && eventos.length === 0 && (
                     <div className="p-10 text-center text-slate-400">
                         Nenhum evento cadastrado.
                     </div>
                 )}
+                {!loading && <Paginacao pagina={paginaAtual} total={eventos.length} onPaginaChange={setPagina} />}
             </div>
         </div>
     )

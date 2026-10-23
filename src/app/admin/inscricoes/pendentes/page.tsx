@@ -16,9 +16,11 @@ interface Pendente {
 }
 const data = (valor: string) => new Date(valor).toLocaleString('pt-BR', { timeZone: 'America/Bahia' })
 const moeda = (valor: string | null) => valor === null ? 'Não definido' : `R$ ${Number(valor).toFixed(2)}`
+const normalizarNome = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
 
 export default function InscricoesPendentesPage() {
     const [pendentes, setPendentes] = useState<Pendente[]>([])
+    const [busca, setBusca] = useState('')
     const [loading, setLoading] = useState(true)
     const [processing, setProcessing] = useState(false)
     const [alvo, setAlvo] = useState<Pendente | null>(null)
@@ -99,18 +101,25 @@ export default function InscricoesPendentesPage() {
         </li>)}</ul> : <p className="text-xs text-slate-500">Sem reservas. Conferência manual pelo preço atual.</p>
     }
 
+    const termoBusca = normalizarNome(busca)
+    const pendentesFiltrados = pendentes.filter(p => normalizarNome(p.aluno.nome).includes(termoBusca))
+
     return <div className="space-y-6">
         <h1 className="text-3xl font-bold">Aprovações Pendentes</h1>
         <p className="text-sm text-slate-600">Confira o comprovante recebido pelo WhatsApp do financeiro: +55 75 98218-1138. A aprovação usa o valor da reserva selecionada, inclusive vencida, ou o preço atual quando não houver reserva. O Pix estático copiado continua utilizável no banco após o vencimento.</p>
         <Link href="/admin/financeiro" className="text-blue-700 underline">Ver relatório financeiro</Link>
+        <div className="max-w-md space-y-2">
+            <label htmlFor="busca-aluno" className="block text-sm font-medium">Buscar pelo nome do aluno</label>
+            <Input id="busca-aluno" type="search" placeholder="Digite o nome do aluno..." value={busca} onChange={e => setBusca(e.target.value)} />
+        </div>
         {loading ? <p role="status">Carregando...</p> : <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full text-left text-sm">
             <thead className="bg-slate-50"><tr>{['Aluno', 'Evento / preço atual', 'Reservas Pix', 'Solicitação', 'Conferência'].map(t => <th key={t} scope="col" className="p-4">{t}</th>)}</tr></thead>
-            <tbody className="divide-y">{pendentes.map(p => <tr key={p.id}>
+            <tbody className="divide-y">{pendentesFiltrados.map(p => <tr key={p.id}>
                 <td className="p-4">{p.aluno.nome}<p className="text-xs text-slate-500">{p.aluno.id}</p></td>
                 <td className="p-4">{p.evento.nome}<p className="font-semibold">{moeda(p.evento.preco)}</p><p className="text-xs">Vagas: {p.evento._count.inscricoes} / {p.evento.totalVagas}</p></td>
                 <td className="p-4">{reservas(p)}</td><td className="p-4">{data(p.dataInscricao)}</td>
                 <td className="p-4"><Button size="sm" disabled={processing || p.evento._count.inscricoes >= p.evento.totalVagas} onClick={() => abrir(p)}>Aprovar</Button></td>
-            </tr>)}{pendentes.length === 0 && <tr><td colSpan={5} className="p-10 text-center">Nenhuma aprovação pendente.</td></tr>}</tbody>
+            </tr>)}{pendentesFiltrados.length === 0 && <tr><td colSpan={5} className="p-10 text-center">{pendentes.length === 0 ? 'Nenhuma aprovação pendente.' : 'Nenhum aluno encontrado para esta busca.'}</td></tr>}</tbody>
         </table></div>}
         <dialog ref={dialogRef} aria-labelledby="conferencia-titulo" className="m-auto w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl p-6 backdrop:bg-slate-900/50"
             onCancel={e => { if (processing) e.preventDefault(); else setAlvo(null) }}>

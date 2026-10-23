@@ -13,12 +13,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 import { hasAdminPermission } from '@/lib/admin-permissions'
 import { ExcluirInscricaoDialog, type AlvoExclusao } from '@/components/admin/ExcluirInscricaoDialog'
+import { Paginacao, ITENS_POR_PAGINA } from '@/components/admin/Paginacao'
 
 export default function InscricoesEventoPage() {
     const session = useAdminSession()
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
     const [inscricoes, setInscricoes] = useState<any[]>([])
+    const [pagina, setPagina] = useState(1)
+    const paginaAtual = Math.min(pagina, Math.max(1, Math.ceil(inscricoes.length / ITENS_POR_PAGINA)))
+    const inscricoesPaginadas = inscricoes.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
     const [loading, setLoading] = useState(true)
     const [exporting, setExporting] = useState<string | null>(null)
     const [alvoExclusao, setAlvoExclusao] = useState<AlvoExclusao | null>(null)
@@ -32,6 +36,7 @@ export default function InscricoesEventoPage() {
     }
 
     useEffect(() => {
+        setPagina(1)
         async function load() {
             try {
                 // Buscar detalhes do evento
@@ -509,7 +514,7 @@ export default function InscricoesEventoPage() {
                                         </tr>
                                     ))
                                 ) : (
-                                    inscricoes.map(insc => (
+                                    inscricoesPaginadas.map(insc => (
                                         <tr key={insc.id} className="hover:bg-slate-50/50 transition">
                                             <td className="px-6 py-4">
                                                 <p className="font-semibold text-slate-800">{insc.aluno.nome}</p>
@@ -635,6 +640,7 @@ export default function InscricoesEventoPage() {
                             Nenhum aluno inscrito neste evento ainda.
                         </div>
                     )}
+                    {!loading && <Paginacao pagina={paginaAtual} total={inscricoes.length} onPaginaChange={setPagina} />}
                 </CardContent>
             </Card>
             {exclusoes.length > 0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="Exclusões em processamento">
