@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
 import Link from 'next/link'
-import { Calendar, Users, MapPin, ArrowRight, UserPlus, LogIn } from 'lucide-react'
+import * as Dialog from '@radix-ui/react-dialog'
+import { Calendar, Users, ArrowRight, UserPlus, LogIn, X } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function LandingPage() {
@@ -42,11 +43,41 @@ export default function LandingPage() {
                             Garanta sua inscrição e receba seu certificado digital.
                         </p>
                         <div className="mt-10 flex items-center justify-center gap-x-6">
-                            <Button asChild size="lg" className="h-12 px-8 font-bold text-lg">
-                                <Link href="/cadastro">
-                                    <UserPlus className="mr-2" size={20} /> Começar Agora
-                                </Link>
-                            </Button>
+                            <Dialog.Root>
+                                <Dialog.Trigger asChild>
+                                    <Button size="lg" className="h-12 px-8 font-bold text-lg">
+                                        <UserPlus className="mr-2" size={20} /> Começar Agora
+                                    </Button>
+                                </Dialog.Trigger>
+                                <Dialog.Portal>
+                                    <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/60" />
+                                    <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl sm:p-8">
+                                        <Dialog.Title className="pr-8 text-2xl font-bold tracking-tight text-slate-900">
+                                            Você já é aluno da FAZAG?
+                                        </Dialog.Title>
+                                        <Dialog.Description className="mt-3 text-sm leading-6 text-slate-600">
+                                            Escolha uma opção para continuar sua inscrição nos eventos.
+                                        </Dialog.Description>
+                                        <div className="mt-6 flex flex-col gap-3">
+                                            <Button asChild size="lg">
+                                                <Link href="/login">
+                                                    <LogIn className="mr-2" size={20} /> Sim, sou aluno
+                                                </Link>
+                                            </Button>
+                                            <Button asChild size="lg" variant="outline">
+                                                <Link href="/cadastro">
+                                                    <UserPlus className="mr-2" size={20} /> Não sou aluno
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                        <Dialog.Close asChild>
+                                            <Button variant="ghost" size="icon" className="absolute right-3 top-3" aria-label="Fechar">
+                                                <X size={20} />
+                                            </Button>
+                                        </Dialog.Close>
+                                    </Dialog.Content>
+                                </Dialog.Portal>
+                            </Dialog.Root>
                             <Link href="/login" className="text-sm font-semibold leading-6 text-white hover:text-primary transition">
                                 Já sou cadastrado <span aria-hidden="true">→</span>
                             </Link>
