@@ -52,16 +52,25 @@ export default function GerenciarInscricaoPage() {
     )
 
     useEffect(() => {
-        loadInscricao()
-    }, [])
+        void loadInscricao()
+        const refresh = () => { if (document.visibilityState === 'visible') void loadInscricao(false) }
+        window.addEventListener('focus', refresh)
+        document.addEventListener('visibilitychange', refresh)
+        const timer = window.setInterval(refresh, 60_000)
+        return () => {
+            window.clearInterval(timer)
+            window.removeEventListener('focus', refresh)
+            document.removeEventListener('visibilitychange', refresh)
+        }
+    }, [params.id])
 
-    async function loadInscricao() {
+    async function loadInscricao(atualizarGrade = true) {
         try {
-            const res = await apiFetch(`/api/inscricoes/${params.id}`)
+            const res = await apiFetch(`/api/inscricoes/${params.id}`, { cache: 'no-store' })
             if (res.ok) {
                 const json = await res.json()
                 setData(json.data)
-                if (json.data.subeventosEscolhidos) {
+                if (atualizarGrade && json.data.subeventosEscolhidos) {
                     setSelectedSubs(json.data.subeventosEscolhidos.map((s: any) => s.subeventoId))
                 }
             } else {
@@ -318,7 +327,7 @@ export default function GerenciarInscricaoPage() {
                             </Card>
                         )}
 
-                        {(evento.status === 'FINISHED' || agora > new Date(evento.dataFim) || data.certificado) && (
+                        {(data.certificacao?.eventoFinalizado || data.certificado) && (
                             <Card className="border-blue-100 bg-blue-50/30">
                                 <CardHeader>
                                     <CardTitle className="text-blue-700">Certificado Digital</CardTitle>
@@ -342,11 +351,11 @@ export default function GerenciarInscricaoPage() {
                                     ) : (
                                         <div className="text-center space-y-4">
                                             <p className="text-sm text-slate-600">
-                                                O evento foi concluído. Você já pode gerar seu certificado de participação.
+                                                {data.certificacao?.liberado ? 'O evento foi concluído e sua presença está confirmada. Você já pode gerar seu certificado de participação.' : data.certificacao?.motivo}
                                             </p>
                                             <Button
                                                 onClick={handleEmitirCertificado}
-                                                disabled={emittingCert}
+                                                disabled={emittingCert || !data.certificacao?.liberado}
                                                 className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700"
                                             >
                                                 {emittingCert ? <Loader2 className="animate-spin mr-2" /> : null}

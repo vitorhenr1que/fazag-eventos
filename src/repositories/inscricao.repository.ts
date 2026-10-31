@@ -41,7 +41,7 @@ export class InscricaoRepository {
         return prisma.inscricao.findMany({
             where: { alunoId },
             include: {
-                evento: true,
+                evento: { include: { certificado: { select: { ativo: true } } } },
                 certificado: true,
                 checkIn: true,
                 subeventosEscolhidos: { include: { checkIn: true, subevento: true } }

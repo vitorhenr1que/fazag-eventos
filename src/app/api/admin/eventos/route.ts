@@ -8,6 +8,7 @@ import { adminEventWhere } from '@/lib/admin-permissions'
 import { chavePixSchema } from '@/lib/evento-pagamento'
 
 const adminCreateEventoSchema = z.object({
+    certificado: z.object({ fundoUrl: z.string().max(255).nullable().optional(), template: z.unknown().optional(), ativo: z.boolean() }).strip().optional(),
     nome: z.string(),
     slug: z.string(),
     descricao: z.string().optional().nullable(),

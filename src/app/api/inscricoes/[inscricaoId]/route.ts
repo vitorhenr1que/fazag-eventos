@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { InscricaoRepository } from '@/repositories/inscricao.repository'
 import { handleApiError } from '@/lib/app-error'
 import { getAlunoFromHeader } from '@/lib/auth-aluno'
+import { avaliarCertificacao } from '@/lib/certificacao'
 
 const repo = new InscricaoRepository()
 
@@ -23,7 +24,7 @@ export async function GET(
             return NextResponse.json({ error: { message: 'Não autorizado' } }, { status: 403 })
         }
 
-        return NextResponse.json({ success: true, data: inscricao })
+        return NextResponse.json({ success: true, data: { ...inscricao, certificacao: avaliarCertificacao(inscricao as any) } }, { headers: { 'Cache-Control': 'no-store' } })
     } catch (error) {
         return handleApiError(error)
     }

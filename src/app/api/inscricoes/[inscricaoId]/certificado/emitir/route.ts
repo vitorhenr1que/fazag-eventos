@@ -11,9 +11,9 @@ export async function POST(
 ) {
     try {
         const { inscricaoId } = await params
-        await getAlunoFromHeader(request)
+        const aluno = await getAlunoFromHeader(request)
 
-        const certificado = await inscricaoService.emitirCertificado(inscricaoId)
+        const certificado = await inscricaoService.emitirCertificado(inscricaoId, aluno.id)
 
         return NextResponse.json({ success: true, data: certificado })
     } catch (error) {

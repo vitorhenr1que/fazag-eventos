@@ -15,6 +15,7 @@ function ambiente() {
             findUnique: async () => evento,
             findMany: async () => [evento],
         },
+        certificado: { create: async ({ data }) => (evento.certificado = { id: 'config-certificado', ...data }) },
         $transaction: async callback => callback(db),
     }
     const cache = new Map()
@@ -55,6 +56,19 @@ const request = body => new Request('http://localhost/api/admin/eventos', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 })
 const params = { params: Promise.resolve({ id: 'evento-1' }) }
+
+test('cadastro preserva a configuração Liberar Emissão e o modelo do certificado', async () => {
+    for (const ativo of [true, false]) {
+        const api = ambiente()
+        const certificado = { ativo, template: { elements: [] }, fundoUrl: 'https://example.com/certificado.png' }
+        const res = await api.create(request({ ...payload, certificado }))
+        assert.equal(res.status, 201)
+        const json = await res.json()
+        assert.equal(json.data.certificado.ativo, ativo)
+        assert.deepEqual(json.data.certificado.template, certificado.template)
+        assert.equal(json.data.certificado.fundoUrl, certificado.fundoUrl)
+    }
+})
 
 test('API salva chave Pix no cadastro e retorna em detalhes e listagem', async () => {
     const api = ambiente()

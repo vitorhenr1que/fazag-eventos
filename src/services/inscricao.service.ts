@@ -4,6 +4,7 @@ import { EventoRepository } from '@/repositories/evento.repository'
 import { AppError } from '@/lib/app-error'
 import { comLockFinanceiro } from '@/lib/financeiro-lock'
 import { calcularPagamento, reconhecerReferencia, type AprovacaoFinanceira } from '@/lib/financeiro'
+import { avaliarCertificacao } from '@/lib/certificacao'
 
 const inscricaoRepo = new InscricaoRepository()
 const eventoRepo = new EventoRepository()
@@ -217,9 +218,10 @@ export class InscricaoService {
         })
     }
 
-    async emitirCertificado(inscricaoId: string) {
+    async emitirCertificado(inscricaoId: string, alunoId: string) {
         const inscricao = await inscricaoRepo.findById(inscricaoId) as any
         if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
+        if (inscricao.alunoId !== alunoId) throw new AppError('Não autorizado', 403)
         if (inscricao.status !== 'CONFIRMADA') throw new AppError('A inscrição precisa estar confirmada para emitir certificado')
 
         // Verificar configuração do certificado
@@ -231,32 +233,9 @@ export class InscricaoService {
         // Verificar se já tem certificado
         if (inscricao.certificado) return inscricao.certificado
 
-        // Verificar se evento terminou (Opcional: permitir emissão antecipada se for manual, mas aqui é automático)
-        if (new Date() < new Date(inscricao.evento.dataFim)) {
-            throw new AppError('O certificado só pode ser gerado após o término do evento', 400)
-        }
-
-        let cargaHoraria = 0
-        let apto = false
-
-        // Regra 1: Evento sem subeventos
-        if (!inscricao.evento.temSubeventos) {
-            // Exige check-in no evento pai
-            if (!inscricao.checkIn) throw new AppError('Presença não confirmada no evento (Check-in obrigatório)')
-            cargaHoraria = inscricao.evento.cargaHorariaBase || 0
-            apto = true
-        }
-        // Regra 2: Evento com subeventos
-        else {
-            // Exige pelo menos 1 subevento com check-in
-            const subeventosComPresenca = (inscricao.subeventosEscolhidos as any[]).filter((s: any) => s.checkIn)
-            if (subeventosComPresenca.length === 0) throw new AppError('Nenhum check-in registrado nas atividades deste evento')
-
-            cargaHoraria = subeventosComPresenca.reduce((acc: number, curr: any) => acc + curr.subevento.cargaHoraria, 0)
-            apto = true
-        }
-
-        if (cargaHoraria === 0) throw new AppError('Carga horária insuficiente para certificação')
+        const avaliacao = avaliarCertificacao(inscricao)
+        if (!avaliacao.liberado) throw new AppError(avaliacao.motivo!, 400)
+        const cargaHoraria = avaliacao.cargaHoraria
 
         const codigoValidacao = Math.random().toString(36).substring(2, 10).toUpperCase()
 

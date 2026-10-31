@@ -17,16 +17,26 @@ export default function MinhasInscricoesPage() {
     const [generatingId, setGeneratingId] = useState<string | null>(null)
 
     const loadInscricoes = async () => {
-        const res = await apiFetch('/api/minhas-inscricoes')
-        if (res.ok) {
+        try {
+            const res = await apiFetch('/api/minhas-inscricoes', { cache: 'no-store' })
             const json = await res.json()
+            if (!res.ok) throw new Error(json.error?.message || 'Não foi possível carregar suas inscrições')
             setInscricoes(json.data)
-        }
-        setLoading(false)
+        } catch (error) { toast.error(error instanceof Error ? error.message : 'Erro de conexão') }
+        finally { setLoading(false) }
     }
 
     useEffect(() => {
-        loadInscricoes()
+        void loadInscricoes()
+        const refresh = () => { if (document.visibilityState === 'visible') void loadInscricoes() }
+        window.addEventListener('focus', refresh)
+        document.addEventListener('visibilitychange', refresh)
+        const timer = window.setInterval(refresh, 60_000)
+        return () => {
+            window.clearInterval(timer)
+            window.removeEventListener('focus', refresh)
+            document.removeEventListener('visibilitychange', refresh)
+        }
     }, [])
 
     const handleGerarCertificado = async (inscricaoId: string) => {
@@ -112,12 +122,8 @@ export default function MinhasInscricoesPage() {
             ) : (
                 <div className="space-y-4">
                     {inscricoes.map((insc: any) => {
-                        const temPresenca = insc.evento.temSubeventos
-                            ? (insc.subeventosEscolhidos || []).some((s: any) => !!s.checkIn)
-                            : !!insc.checkIn;
-
-                        const eventoFinalizado = new Date() > new Date(insc.evento.dataFim);
-                        const podeGerarCertificado = insc.status === 'CONFIRMADA' && !insc.certificado && temPresenca && eventoFinalizado;
+                        const temPresenca = insc.certificacao?.temPresenca;
+                        const podeGerarCertificado = !insc.certificado && insc.certificacao?.liberado;
 
                         return (
                             <Card key={insc.id} className="overflow-hidden border-none shadow-md bg-white">
@@ -184,10 +190,10 @@ export default function MinhasInscricoesPage() {
                                                 </Button>
                                             )}
 
-                                            {!podeGerarCertificado && temPresenca && !eventoFinalizado && (
+                                            {!podeGerarCertificado && !insc.certificado && insc.status === 'CONFIRMADA' && insc.certificacao?.motivo && (
                                                 <div className="flex flex-col items-center md:items-end justify-center">
                                                     <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                                                        Certificado liberado em {formatDate(insc.evento.dataFim, 'dd/MM [HH:mm]')}
+                                                        {insc.certificacao.motivo}
                                                     </span>
                                                 </div>
                                             )}
