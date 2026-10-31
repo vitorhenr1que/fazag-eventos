@@ -1,0 +1,3 @@
+ALTER TABLE `admins`
+  ADD COLUMN `ativo` BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN `permissoes` JSON NULL;

@@ -6,7 +6,7 @@ import { ExclusaoInscricaoService } from '@/services/exclusao-inscricao.service'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ inscricaoId: string }> }) {
     try {
-        const admin = await getAdminFromHeader(request, 'ADMINISTRADOR')
+        const admin = await getAdminFromHeader(request, 'EXCLUIR_INSCRICAO')
         const { inscricaoId } = await params
         let body: unknown
         try { body = await request.json() } catch { throw new AppError('JSON inválido') }

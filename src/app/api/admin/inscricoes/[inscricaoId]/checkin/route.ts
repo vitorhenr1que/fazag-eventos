@@ -2,6 +2,7 @@ import { getAdminFromHeader } from '@/lib/auth-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { InscricaoService } from '@/services/inscricao.service'
 import { handleApiError } from '@/lib/app-error'
+import { adminCheckinSchema } from '@/lib/admin-checkin'
 
 const inscricaoService = new InscricaoService()
 
@@ -15,7 +16,7 @@ export async function POST(
         // Admin fazendo check-in manual para um aluno
         // Pode passar query param ?tipo=EVENTO ou body
 
-        const body = await request.json() // { tipo: 'EVENTO', subeventoId?: string }
+        const body = adminCheckinSchema.parse(await request.json())
 
         const tipo = body.tipo || 'EVENTO'
 

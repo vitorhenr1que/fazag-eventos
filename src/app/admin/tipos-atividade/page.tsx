@@ -1,4 +1,6 @@
 'use client'
+import { canEditAdmin } from '@/lib/admin-permissions'
+import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +35,7 @@ const emptyForm: TipoAtividadeForm = {
 }
 
 export default function TiposAtividadePage() {
+    const readOnly = !canEditAdmin(useAdminSession())
     const [tipos, setTipos] = useState<TipoAtividade[]>([])
     const [formData, setFormData] = useState<TipoAtividadeForm>(emptyForm)
     const [editingId, setEditingId] = useState<string | null>(null)
@@ -128,7 +131,7 @@ export default function TiposAtividadePage() {
                         {editingId ? 'Editar Tipo de Atividade' : 'Novo Tipo de Atividade'}
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent><fieldset disabled={readOnly}>
                     <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
                         <div className="md:col-span-2">
                             <label className="text-sm font-medium mb-1 block">Tipo de Atividade</label>
@@ -188,7 +191,7 @@ export default function TiposAtividadePage() {
                             </Button>
                         </div>
                     </form>
-                </CardContent>
+                </fieldset></CardContent>
             </Card>
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -218,10 +221,10 @@ export default function TiposAtividadePage() {
                                     <td className="px-6 py-4 text-sm text-slate-600">{tipo.porcentagemAnual}%</td>
                                     <td className="px-6 py-4 text-sm text-slate-600">{tipo._count?.eventos || 0}</td>
                                     <td className="px-6 py-4 text-right space-x-1">
-                                        <Button variant="ghost" size="sm" type="button" onClick={() => startEdit(tipo)} title="Editar">
+                                        <Button disabled={readOnly} variant="ghost" size="sm" type="button" onClick={() => startEdit(tipo)} title="Editar">
                                             <Edit2 size={16} />
                                         </Button>
-                                        <Button variant="ghost" size="sm" type="button" onClick={() => handleDelete(tipo)} title="Excluir">
+                                        <Button disabled={readOnly} variant="ghost" size="sm" type="button" onClick={() => handleDelete(tipo)} title="Excluir">
                                             <Trash2 size={16} className="text-red-500" />
                                         </Button>
                                     </td>

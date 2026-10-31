@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { adminEventWhere } from '@/lib/admin-permissions'
 import prisma from '@/lib/db'
 import { getAdminFromHeader } from '@/lib/auth-admin'
 import { AppError, handleApiError } from '@/lib/app-error'
 
 export async function GET(request: NextRequest) {
     try {
-        await getAdminFromHeader(request, 'FINANCEIRO')
+        const admin = await getAdminFromHeader(request, 'FINANCEIRO')
         const eventoId = request.nextUrl.searchParams.get('eventoId')
-        const eventos = await prisma.evento.findMany({ select: { id: true, nome: true }, orderBy: { dataInicio: 'desc' } })
+        const eventos = await prisma.evento.findMany({ where: adminEventWhere(admin), select: { id: true, nome: true }, orderBy: { dataInicio: 'desc' } })
         if (!eventoId) return NextResponse.json({ success: true, data: { eventos, evento: null } })
         const evento = await prisma.evento.findUnique({
             where: { id: eventoId },

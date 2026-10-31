@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
             if (res.ok) {
                 localStorage.setItem('admin-token', json.token)
                 toast.success('Login realizado com sucesso')
-                router.replace(adminHome(json.admin.role))
+                router.replace(adminHome(json.admin))
             } else {
                 toast.error(json.error?.message || 'Credenciais inválidas')
             }

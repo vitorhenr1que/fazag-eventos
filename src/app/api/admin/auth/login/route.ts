@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
         const admin = await prisma.admin.findUnique({ where: { email } })
 
-        if (!admin) {
+        if (!admin || !admin.ativo) {
             // Por segurança, tempo constante ou mensagem genérica
             throw new AppError('Credenciais inválidas', 401)
         }
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
         const token = adminAuth.signToken({ id: admin.id, role: admin.role })
 
-        return NextResponse.json({ success: true, token, admin: { id: admin.id, nome: admin.nome, email: admin.email, role: admin.role } })
+        return NextResponse.json({ success: true, token, admin: { id: admin.id, nome: admin.nome, email: admin.email, role: admin.role, permissoes: admin.permissoes } })
     } catch (error) {
         return handleApiError(error)
     }

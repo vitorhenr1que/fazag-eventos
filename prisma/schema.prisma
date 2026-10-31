@@ -24,6 +24,8 @@ model Admin {
   senha     String   @db.VarChar(255)
   nome      String   @db.VarChar(120)
   role      Role     @default(ADMIN)
+  ativo     Boolean  @default(true)
+  permissoes Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

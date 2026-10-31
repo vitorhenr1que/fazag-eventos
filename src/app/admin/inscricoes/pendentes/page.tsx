@@ -1,4 +1,6 @@
 'use client'
+import { canEditAdmin } from '@/lib/admin-permissions'
+import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -19,6 +21,7 @@ const moeda = (valor: string | null) => valor === null ? 'Não definido' : `R$ $
 const normalizarNome = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
 
 export default function InscricoesPendentesPage() {
+    const readOnly = !canEditAdmin(useAdminSession())
     const [pendentes, setPendentes] = useState<Pendente[]>([])
     const [busca, setBusca] = useState('')
     const [loading, setLoading] = useState(true)
@@ -118,7 +121,7 @@ export default function InscricoesPendentesPage() {
                 <td className="p-4">{p.aluno.nome}<p className="text-xs text-slate-500">{p.aluno.id}</p></td>
                 <td className="p-4">{p.evento.nome}<p className="font-semibold">{moeda(p.evento.preco)}</p><p className="text-xs">Vagas: {p.evento._count.inscricoes} / {p.evento.totalVagas}</p></td>
                 <td className="p-4">{reservas(p)}</td><td className="p-4">{data(p.dataInscricao)}</td>
-                <td className="p-4"><Button size="sm" disabled={processing || p.evento._count.inscricoes >= p.evento.totalVagas} onClick={() => abrir(p)}>Aprovar</Button></td>
+                <td className="p-4"><Button size="sm" disabled={readOnly || processing || p.evento._count.inscricoes >= p.evento.totalVagas} onClick={() => abrir(p)}>Aprovar</Button></td>
             </tr>)}{pendentesFiltrados.length === 0 && <tr><td colSpan={5} className="p-10 text-center">{pendentes.length === 0 ? 'Nenhuma aprovação pendente.' : 'Nenhum aluno encontrado para esta busca.'}</td></tr>}</tbody>
         </table></div>}
         <dialog ref={dialogRef} aria-labelledby="conferencia-titulo" className="m-auto w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl p-6 backdrop:bg-slate-900/50"
@@ -126,29 +129,29 @@ export default function InscricoesPendentesPage() {
             {alvo && <form className="space-y-4" onSubmit={e => { e.preventDefault(); aprovar() }}>
                 <h2 id="conferencia-titulo" className="text-xl font-bold">Conferir pagamento</h2><p>{alvo.aluno.nome} · {alvo.evento.nome}</p>
                 <label htmlFor="modalidade" className="block">Modalidade</label>
-                <select id="modalidade" className="w-full border rounded p-2" value={modalidade} disabled={processing} onChange={e => setModalidade(e.target.value as Modalidade)}>
+                <select id="modalidade" className="w-full border rounded p-2" value={modalidade} disabled={readOnly || processing} onChange={e => setModalidade(e.target.value as Modalidade)}>
                     <option value="PAGO">Pagamento integral</option><option value="DESCONTO">Conceder desconto explicitamente</option><option value="ISENTO">Isenção (sem transferência)</option>
                 </select>
                 {modalidade !== 'ISENTO' ? <>
                     <label htmlFor="reserva" className="block">Reserva correspondente ao comprovante</label>
-                    <select id="reserva" className="w-full border rounded p-2" value={quoteId} disabled={processing} onChange={e => setQuoteId(e.target.value)}>
+                    <select id="reserva" className="w-full border rounded p-2" value={quoteId} disabled={readOnly || processing} onChange={e => setQuoteId(e.target.value)}>
                         <option value="">Sem reserva / pagamento antigo</option>{alvo.reservasPix.map(r => <option key={r.id} value={r.id}>{moeda(r.valor)} · {r.txid} · até {data(r.expiresAt)}</option>)}
                     </select>
                     {reservas(alvo)}
                     {modalidade === 'DESCONTO' && <>
                         <label htmlFor="valor-pago" className="block">Valor efetivamente recebido (R$)</label>
-                        <Input id="valor-pago" inputMode="decimal" required disabled={processing} value={valorPago} onChange={e => setValorPago(e.target.value)} />
+                        <Input id="valor-pago" inputMode="decimal" required disabled={readOnly || processing} value={valorPago} onChange={e => setValorPago(e.target.value)} />
                     </>}
                     {reserva?.invalidadaAt && <p role="alert" className="text-amber-800">Reserva invalidada. Selecione a conferência sem reserva para aplicar o preço atual ou conceder desconto.</p>}
                 </> : <p>Isenção confirma sem transferência, com recebimento de R$ 0,00.</p>}
                 <p>Referência reconhecida: {moeda(referencia ?? null)}</p>
                 {modalidade !== 'PAGO' && <>
                     <label htmlFor="observacao" className="block">Observação / motivo</label>
-                    <Input id="observacao" maxLength={500} required={modalidade === 'DESCONTO' && (!quoteId || !reservaUtilizavel)} disabled={processing} value={observacao} onChange={e => setObservacao(e.target.value)} />
+                    <Input id="observacao" maxLength={500} required={modalidade === 'DESCONTO' && (!quoteId || !reservaUtilizavel)} disabled={readOnly || processing} value={observacao} onChange={e => setObservacao(e.target.value)} />
                 </>}
                 <p className="text-xs text-slate-500">O horário da aprovação será registrado. O horário da transferência não será informado; a conferência é manual.</p>
-                <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={processing} onClick={() => setAlvo(null)}>Voltar</Button>
-                    <Button type="submit" disabled={processing}>{processing ? 'Salvando...' : 'Confirmar aprovação'}</Button></div>
+                <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={readOnly || processing} onClick={() => setAlvo(null)}>Voltar</Button>
+                    <Button type="submit" disabled={readOnly || processing}>{processing ? 'Salvando...' : 'Confirmar aprovação'}</Button></div>
             </form>}
         </dialog>
     </div>

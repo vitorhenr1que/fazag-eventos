@@ -31,10 +31,11 @@ test('administradores têm acesso a todas as áreas; perfis desconhecidos não t
     for (const permission of ['GESTAO', 'FINANCEIRO', 'SESSAO']) assert.equal(hasAdminPermission('ALUNO', permission), false)
 })
 
-test('excluir inscrição pela lista de inscritos é privilégio exclusivo do administrador', () => {
-    for (const role of ['FINANCEIRO', 'NUPPEX', 'ALUNO']) assert.equal(hasAdminPermission(role, 'ADMINISTRADOR'), false)
+test('perfis padrão exigem administrador para excluir inscrição; rota valida a permissão específica', () => {
+    for (const role of ['FINANCEIRO', 'NUPPEX', 'ALUNO']) assert.equal(hasAdminPermission(role, 'EXCLUIR_INSCRICAO'), false)
+    for (const role of ['ADMIN', 'SUPER_ADMIN']) assert.equal(hasAdminPermission(role, 'EXCLUIR_INSCRICAO'), true)
     const route = fs.readFileSync(path.resolve(__dirname, '../src/app/api/admin/inscricoes/[inscricaoId]/excluir/route.ts'), 'utf8')
-    assert.match(route, /getAdminFromHeader\(request, 'ADMINISTRADOR'\)/)
+    assert.match(route, /getAdminFromHeader\(request, 'EXCLUIR_INSCRICAO'\)/)
 })
 
 test('todas as rotas administrativas protegidas validam o perfil no servidor', () => {

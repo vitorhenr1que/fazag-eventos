@@ -4,6 +4,7 @@ import { getAdminFromHeader } from '@/lib/auth-admin'
 import { EventoService } from '@/services/evento.service'
 import { handleApiError } from '@/lib/app-error'
 import { z } from 'zod'
+import { adminEventWhere } from '@/lib/admin-permissions'
 import { chavePixSchema } from '@/lib/evento-pagamento'
 
 const adminCreateEventoSchema = z.object({
@@ -44,8 +45,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     try {
-        await getAdminFromHeader(request)
+        const admin = await getAdminFromHeader(request)
         const eventos = await prisma.evento.findMany({
+            where: adminEventWhere(admin),
             orderBy: { dataInicio: 'desc' },
             include: {
                 tipoAtividade: true,

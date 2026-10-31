@@ -31,7 +31,7 @@ export default function EditarEventoPage() {
     useEffect(() => {
         async function load() {
             const [eventoRes, tiposRes] = await Promise.all([
-                apiFetch(`/api/eventos/${params.id}`),
+                apiFetch(`/api/admin/eventos/${params.id}`, { isAdmin: true }),
                 apiFetch('/api/admin/tipos-atividade', { isAdmin: true })
             ])
 

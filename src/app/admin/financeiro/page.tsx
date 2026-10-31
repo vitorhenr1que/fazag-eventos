@@ -9,7 +9,7 @@ import { celulaCsv, resumirFinanceiro, situacaoDoRegistro, situacoesFinanceiras,
 import { Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
-import { hasAdminPermission } from '@/lib/admin-permissions'
+import { canEditAdmin, canAccessAdminPage } from '@/lib/admin-permissions'
 
 interface Cancelado extends RegistroFinanceiro { alunoNome: string; createdAt: string; responsavelCancelamento: string; motivo: string | null }
 interface ReservaFinanceira { id: string; inscricaoId: string; valor: string; txid: string; createdAt: string; expiresAt: string }
@@ -19,6 +19,7 @@ const data = (valor: string | null | undefined) => valor ? new Date(valor).toLoc
 
 export default function FinanceiroPage() {
     const session = useAdminSession()
+    const readOnly = !canEditAdmin(session)
     const [eventos, setEventos] = useState<{ id: string; nome: string }[]>([])
     const [eventoId, setEventoId] = useState('')
     const [evento, setEvento] = useState<EventoFinanceiro | null>(null)
@@ -153,7 +154,7 @@ export default function FinanceiroPage() {
         : !evento ? <p className="p-8 text-center text-slate-500">Selecione um evento para consultar os inscritos e os recebimentos.</p>
         : <>
             <div className="flex flex-wrap justify-between gap-2"><h2 className="text-xl font-bold text-slate-800">{evento.nome}</h2>
-                {hasAdminPermission(session.role, 'GESTAO') && <Link href={`/admin/eventos/${evento.id}/inscricoes`} className="text-blue-700 underline">Ver inscrições</Link>}</div>
+                {canAccessAdminPage(session, '/admin/eventos') && <Link href={`/admin/eventos/${evento.id}/inscricoes`} className="text-blue-700 underline">Ver inscrições</Link>}</div>
             <p className="text-sm text-slate-500">Preço atual: {moeda(evento.preco)}. Os recebimentos usam os valores registrados na aprovação.</p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {[
@@ -198,9 +199,9 @@ export default function FinanceiroPage() {
                             {i.exclusaoEmProcessamento ? <span className="text-xs text-amber-700">Exclusão em processamento</span>
                             : i.reembolsoEmProcessamento ? <span className="text-xs text-amber-700">Reembolso em processamento</span>
                             : i.status === 'CONFIRMADA' && i.situacaoFinanceira !== 'GRATUITO' && (evento.tipo === 'PAGO' || ['PAGO', 'DESCONTO', 'ISENTO'].includes(i.situacaoFinanceira || '')) ? <div className="flex flex-col gap-2">
-                                {(i.valorPago === null || Number(i.valorPago) > 0) && <Button size="sm" variant="outline" className="text-red-700" disabled={processando}
+                                {(i.valorPago === null || Number(i.valorPago) > 0) && <Button size="sm" variant="outline" className="text-red-700" disabled={readOnly || processando}
                                     onClick={() => abrirAcao('REEMBOLSO', i.id, i.aluno.nome, i.valorPago)}>Reembolsar</Button>}
-                                <Button size="sm" variant="outline" disabled={processando} onClick={() => abrirAcao('CANCELAMENTO', i.id, i.aluno.nome, i.valorPago)}>Cancelar pagamento</Button>
+                                <Button size="sm" variant="outline" disabled={readOnly || processando} onClick={() => abrirAcao('CANCELAMENTO', i.id, i.aluno.nome, i.valorPago)}>Cancelar pagamento</Button>
                             </div> : <span className="text-slate-400">—</span>}
                         </td>
                     </tr>)}{filtrados.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-slate-500">Nenhuma inscrição encontrada.</td></tr>}</tbody>
@@ -231,7 +232,7 @@ export default function FinanceiroPage() {
                         <td className="p-4"><p className="font-semibold">{r.alunoNome}</p><p className="text-xs text-slate-500">{r.alunoEmail || r.alunoId}</p></td>
                         <td className="p-4 font-semibold whitespace-nowrap">{moeda(r.valorPago)}</td><td className="p-4">{r.estado === 'CONCLUIDO' ? 'Reembolsado' : 'Em processamento'}</td>
                         <td className="p-4 whitespace-nowrap">Reembolso: {data(r.dataReembolso)}<br />Aprovação: {data(r.dataPagamento)}<br />Aprovado por: {r.responsavel || '—'}{auditoria(r)}<p>Referência: {moeda(r.valorReferencia)} · Desconto: {moeda(r.valorDesconto)}</p></td><td className="p-4">{r.responsavelReembolso || '—'}</td><td className="p-4">{r.motivo || '—'}</td>
-                        <td className="p-4">{r.estado !== 'CONCLUIDO' ? <Button size="sm" variant="outline" disabled={processando}
+                        <td className="p-4">{r.estado !== 'CONCLUIDO' ? <Button size="sm" variant="outline" disabled={readOnly || processando}
                             onClick={() => abrirAcao('REEMBOLSO', r.inscricaoOriginalId, r.alunoNome, r.valorPago)}>Concluir reembolso</Button> : '—'}</td>
                     </tr>)}{reembolsosFiltrados.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-500">Nenhum reembolso registrado.</td></tr>}</tbody>
                 </table></div>
@@ -260,8 +261,8 @@ export default function FinanceiroPage() {
                     <label htmlFor="motivo-reembolso" className="block text-sm font-semibold">Motivo (opcional)</label>
                     <Input id="motivo-reembolso" maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
                 </> : <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">O pagamento ou isenção será removido dos totais. O aluno voltará a Pendentes aguardando nova aprovação, com nova conferência pelo preço atual. O histórico do pagamento cancelado será preservado. Esta ação não registra reembolso.</p>}
-                <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={processando} onClick={() => setAcao(null)}>Voltar</Button>
-                    <Button type="submit" className={acao.tipo === 'REEMBOLSO' ? 'bg-red-600 hover:bg-red-700' : ''} disabled={processando}>
+                <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={readOnly || processando} onClick={() => setAcao(null)}>Voltar</Button>
+                    <Button type="submit" className={acao.tipo === 'REEMBOLSO' ? 'bg-red-600 hover:bg-red-700' : ''} disabled={readOnly || processando}>
                         {processando ? 'Processando...' : acao.tipo === 'REEMBOLSO' ? 'Confirmar reembolso e exclusão' : 'Confirmar cancelamento'}
                     </Button></div>
             </form>}

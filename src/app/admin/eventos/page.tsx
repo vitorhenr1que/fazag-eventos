@@ -10,7 +10,7 @@ import { formatDate } from '@/lib/utils'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
-import { hasAdminPermission } from '@/lib/admin-permissions'
+import { canEditAdmin, canCreateEvento, canAccessAdminPage } from '@/lib/admin-permissions'
 import { Paginacao, ITENS_POR_PAGINA } from '@/components/admin/Paginacao'
 
 export default function AdminEventosPage() {
@@ -50,11 +50,11 @@ export default function AdminEventosPage() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-slate-800">Gerenciar Eventos</h1>
-                <Button asChild>
+                {canCreateEvento(session) && <Button asChild>
                     <Link href="/admin/eventos/novo">
                         <Plus className="mr-2" size={20} /> Novo Evento
                     </Link>
-                </Button>
+                </Button>}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -116,14 +116,14 @@ export default function AdminEventosPage() {
                                                 <Users size={16} />
                                             </Link>
                                         </Button>
-                                        {e.tipo === 'PAGO' && hasAdminPermission(session.role, 'FINANCEIRO') && <Button size="sm" variant="outline" asChild>
+                                        {e.tipo === 'PAGO' && canAccessAdminPage(session, '/admin/financeiro') && <Button size="sm" variant="outline" asChild>
                                             <Link href={`/admin/financeiro?eventoId=${e.id}`}>
                                                 Financeiro
                                             </Link>
                                         </Button>}
-                                        <Button variant="ghost" size="sm" asChild title="Editar Evento">
-                                            <Link href={`/admin/eventos/${e.id}/editar`}>
-                                                <Edit2 size={16} />
+                                        <Button variant="ghost" size="sm" asChild title={canEditAdmin(session) ? "Editar Evento" : "Visualizar Evento"}>
+                                            <Link href={`/admin/eventos/${e.id}/${canEditAdmin(session) ? "editar" : "visualizar"}`}>
+                                                {canEditAdmin(session) ? <Edit2 size={16} /> : <Eye size={16} />}
                                             </Link>
                                         </Button>
                                     </td>

@@ -5,7 +5,7 @@ const path = require('node:path')
 const Module = require('node:module')
 const ts = require('typescript')
 require('ts-node').register({ transpileOnly: true, compilerOptions: { target: 'ES2020', module: 'CommonJS', moduleResolution: 'Node' } })
-const { hasAdminPermission } = require('../src/lib/admin-permissions.ts')
+const { hasAdminPermission, canAdminAction } = require('../src/lib/admin-permissions.ts')
 const { AppError } = require('../src/lib/app-error.ts')
 
 function ambiente(inscricoes, subeventos = []) {
@@ -28,7 +28,7 @@ function ambiente(inscricoes, subeventos = []) {
     loaded.require = id => {
         if (id === '@/lib/db') return { __esModule: true, default: db }
         if (id === '@/lib/app-error') return require('../src/lib/app-error.ts')
-        if (id === '@/lib/admin-permissions') return { hasAdminPermission }
+        if (id === '@/lib/admin-permissions') return { hasAdminPermission, canAdminAction }
         if (id === '@/lib/auth-admin') return { getAdminFromHeader: async request => {
             const role = request.headers.get('authorization')
             if (!role) throw new AppError('Token não fornecido', 401)

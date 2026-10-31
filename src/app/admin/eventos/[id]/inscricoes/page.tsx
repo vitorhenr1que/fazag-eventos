@@ -12,14 +12,20 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
-import { hasAdminPermission } from '@/lib/admin-permissions'
+import { hasAdminPermission, canEditAdmin, canAdminAction } from '@/lib/admin-permissions'
 import { ExcluirInscricaoDialog, type AlvoExclusao } from '@/components/admin/ExcluirInscricaoDialog'
 import { Paginacao, ITENS_POR_PAGINA } from '@/components/admin/Paginacao'
+import { SubeventoCheckin } from '@/components/admin/SubeventoCheckin'
 
 const normalizarNome = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
 
 export default function InscricoesEventoPage() {
     const session = useAdminSession()
+    const readOnly = !canEditAdmin(session)
+    const canCheckinSub = canAdminAction(session, 'CHECKIN_SUBEVENTO')
+    const canCheckinGeral = canAdminAction(session, 'CHECKIN_GERAL')
+    const canReleaseCertificate = canAdminAction(session, 'LIBERAR_CERTIFICADO')
+    const canDelete = canAdminAction(session, 'EXCLUIR_INSCRICAO')
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
     const [inscricoes, setInscricoes] = useState<any[]>([])
@@ -54,7 +60,7 @@ export default function InscricoesEventoPage() {
         async function load() {
             try {
                 const [evRes, res] = await Promise.all([
-                    apiFetch(`/api/eventos/${params.id}`),
+                    apiFetch(`/api/admin/eventos/${params.id}`, { isAdmin: true }),
                     apiFetch(`/api/admin/eventos/${params.id}/inscricoes`, { isAdmin: true }),
                 ])
                 const [evJson, json] = await Promise.all([evRes.json(), res.json()])
@@ -77,6 +83,7 @@ export default function InscricoesEventoPage() {
     }, [params.id, tentativa])
 
     async function handleCheckInSub(inscricaoId: string, subeventoId: string) {
+        if (!canCheckinSub) return
         try {
             const res = await apiFetch(`/api/admin/inscricoes/${inscricaoId}/checkin`, {
                 method: 'POST',
@@ -89,6 +96,9 @@ export default function InscricoesEventoPage() {
                 const resList = await apiFetch(`/api/admin/eventos/${params.id}/inscricoes`, { isAdmin: true })
                 const json = await resList.json()
                 setInscricoes(json.data)
+            } else {
+                const json = await res.json()
+                toast.error(json.error?.message || 'Não foi possível fazer check-in no subevento')
             }
         } catch (err) {
             toast.error('Erro ao processar check-in')
@@ -521,8 +531,8 @@ export default function InscricoesEventoPage() {
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Inscrição</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Status</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Presença Geral</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Subeventos (Grade)</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Certificado</th>
+                                    {canCheckinSub && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Subeventos (Grade)</th>}
+                                    {canReleaseCertificate && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Certificado</th>}
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-right">Ação</th>
                                 </tr>
                             </thead>
@@ -537,7 +547,8 @@ export default function InscricoesEventoPage() {
                                             <td className="px-6 py-4"><Skeleton className="h-4 w-20 mx-auto" /></td>
                                             <td className="px-6 py-4"><Skeleton className="h-5 w-24 mx-auto" /></td>
                                             <td className="px-6 py-4"><Skeleton className="h-5 w-20 mx-auto" /></td>
-                                            <td className="px-6 py-4"><Skeleton className="h-10 w-full" /></td>
+                                            {canCheckinSub && <td className="px-6 py-4"><Skeleton className="h-10 w-full" /></td>}
+                                            {canReleaseCertificate && <td className="px-6 py-4"><Skeleton className="h-5 w-20 mx-auto" /></td>}
                                             <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-24 ml-auto" /></td>
                                         </tr>
                                     ))
@@ -577,7 +588,7 @@ export default function InscricoesEventoPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            {canCheckinSub && <td className="px-6 py-4">
                                                 {insc.subeventosEscolhidos?.length > 0 ? (
                                                     <div className="space-y-1">
                                                         {insc.subeventosEscolhidos.map((se: any) => (
@@ -585,16 +596,7 @@ export default function InscricoesEventoPage() {
                                                                 <span className="truncate max-w-[120px]" title={se.subevento.nome}>
                                                                     {se.subevento.nome}
                                                                 </span>
-                                                                {se.checkIn ? (
-                                                                    <span className="text-green-600 font-bold flex items-center gap-0.5"><Check size={10} /> Ok</span>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleCheckInSub(insc.id, se.subeventoId)}
-                                                                        className="text-primary hover:underline font-bold"
-                                                                    >
-                                                                        Check-in
-                                                                    </button>
-                                                                )}
+                                                                <SubeventoCheckin session={session} presente={Boolean(se.checkIn)} onCheckin={() => handleCheckInSub(insc.id, se.subeventoId)} />
                                                             </div>
                                                         ))}
                                                     </div>
@@ -603,8 +605,8 @@ export default function InscricoesEventoPage() {
                                                         {evento?.temSubeventos ? 'Nenhum selecionado' : 'Evento s/ subeventos'}
                                                     </span>
                                                 )}
-                                            </td>
-                                            <td className="px-6 py-4">
+                                            </td>}
+                                            {canReleaseCertificate && <td className="px-6 py-4">
                                                 <div className="flex flex-col items-center gap-1">
                                                     {insc.certificado ? (
                                                         <>
@@ -614,14 +616,14 @@ export default function InscricoesEventoPage() {
                                                             <button
                                                                 onClick={() => handleEmitirCertificado(insc.id, insc.certificado.cargaHorariaTotal)}
                                                                 className="text-[10px] text-slate-500 hover:underline"
-                                                                disabled={emittingId === insc.id}
+                                                                disabled={!canReleaseCertificate || emittingId === insc.id}
                                                             >
                                                                 Editar Carga
                                                             </button>
                                                             <button
                                                                 onClick={() => handleExcluirCertificado(insc.id)}
                                                                 className="inline-flex items-center gap-1 text-[10px] text-red-600 hover:underline disabled:opacity-50"
-                                                                disabled={emittingId === insc.id}
+                                                                disabled={readOnly || emittingId === insc.id}
                                                             >
                                                                 {emittingId === insc.id ? <Loader2 className="animate-spin" size={10} /> : <Trash2 size={10} />}
                                                                 Excluir
@@ -632,26 +634,26 @@ export default function InscricoesEventoPage() {
                                                             size="sm"
                                                             variant="ghost"
                                                             className="h-7 px-2 text-[10px] text-primary hover:bg-primary/5 border border-primary/20"
-                                                            disabled={emittingId === insc.id || insc.status !== 'CONFIRMADA'}
+                                                            disabled={!canReleaseCertificate || emittingId === insc.id || insc.status !== 'CONFIRMADA'}
                                                             onClick={() => handleEmitirCertificado(insc.id)}
                                                         >
                                                             {emittingId === insc.id ? <Loader2 className="animate-spin" size={12} /> : 'Liberar'}
                                                         </Button>
                                                     )}
                                                 </div>
-                                            </td>
+                                            </td>}
                                             <td className="px-6 py-4 text-right space-x-2">
-                                                {hasAdminPermission(session.role, 'ADMINISTRADOR') && <Button size="sm" variant="outline" className="h-8 text-[11px] text-red-700"
+                                                {canDelete && <Button size="sm" variant="outline" className="h-8 text-[11px] text-red-700"
                                                     disabled={exclusoes.some(e => e.inscricaoOriginalId === insc.id)}
                                                     onClick={() => setAlvoExclusao({ id: insc.id, nome: insc.aluno.nome, status: insc.status, situacaoFinanceira: insc.situacaoFinanceira, valorPago: insc.valorPago ?? null })}>
                                                     <Trash2 size={12} className="mr-1" />Excluir inscrição
                                                 </Button>}
-                                                {insc.status === 'PENDENTE' && hasAdminPermission(session.role, 'FINANCEIRO') && (
+                                                {!readOnly && insc.status === 'PENDENTE' && hasAdminPermission(session, 'FINANCEIRO') && (
                                                     <Button size="sm" variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50 h-8 text-[11px]" onClick={() => handleAprovarPagamento(insc.id)}>
                                                         Aprovar
                                                     </Button>
                                                 )}
-                                                {insc.status === 'CONFIRMADA' && !insc.checkIn && (
+                                                {canCheckinGeral && insc.status === 'CONFIRMADA' && !insc.checkIn && (
                                                     <Button size="sm" onClick={() => handleCheckIn(insc.id)} className="h-8 text-[11px]">
                                                         Check-in Geral
                                                     </Button>
@@ -671,7 +673,7 @@ export default function InscricoesEventoPage() {
                     {!loading && <Paginacao pagina={paginaAtual} total={inscricoesFiltradas.length} onPaginaChange={setPagina} />}
                 </CardContent>
             </Card>
-            {exclusoes.length > 0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="Exclusões em processamento">
+            {canDelete && exclusoes.length > 0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="Exclusões em processamento">
                 <h2 className="font-semibold">Exclusões em processamento</h2><p className="text-sm">Conclua as operações iniciadas para atualizar a lista e o relatório financeiro.</p>
                 {exclusoes.map(e => <div key={e.inscricaoOriginalId} className="flex items-center justify-between gap-2"><span>{e.alunoNome}</span>
                     <Button variant="outline" size="sm" onClick={() => setAlvoExclusao({ id: e.inscricaoOriginalId, nome: e.alunoNome, status: 'CONFIRMADA', situacaoFinanceira: null, valorPago: null, modalidadeOriginal: e.modalidade })}>Concluir exclusão</Button></div>)}

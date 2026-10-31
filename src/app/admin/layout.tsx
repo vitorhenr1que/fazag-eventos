@@ -4,7 +4,7 @@ import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Calendar, LogOut, CreditCard, Tags } from 'lucide-react'
+import { LayoutDashboard, Calendar, LogOut, CreditCard, Tags, Users } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import { adminHome, adminRoleLabels, canAccessAdminPage, type AdminSession } from '@/lib/admin-permissions'
@@ -24,24 +24,41 @@ export default function AdminLayout({
 
     useEffect(() => {
         let active = true
+        let verifying = false
         setVerifiedPath(''); setError('')
         if (pathname === '/admin/login') { setSession(null); return }
         if (!localStorage.getItem('admin-token')) { router.replace('/admin/login'); return }
         async function verify() {
+            if (!active || verifying) return
+            if (!localStorage.getItem('admin-token')) { router.replace('/admin/login'); return }
+            verifying = true
             try {
-                const res = await apiFetch('/api/admin/auth/me', { isAdmin: true })
+                const res = await apiFetch('/api/admin/auth/me', { isAdmin: true, cache: 'no-store' })
                 const json = await res.json()
                 if (!active) return
                 if (res.status === 401) { localStorage.removeItem('admin-token'); router.replace('/admin/login'); return }
                 if (!res.ok) throw new Error(json.error?.message || 'Não foi possível verificar seu acesso')
                 const profile: AdminSession = json.data
+                setError('')
                 setSession(profile)
-                if (!canAccessAdminPage(profile.role, pathname)) { router.replace(adminHome(profile.role)); return }
+                if (!canAccessAdminPage(profile, pathname)) { router.replace(adminHome(profile)); return }
                 setVerifiedPath(pathname)
             } catch (err) { if (active) setError(err instanceof Error ? err.message : 'Erro de conexão') }
+            finally { verifying = false }
         }
-        verify()
-        return () => { active = false }
+        const revalidate = () => { if (document.visibilityState === 'visible') void verify() }
+        void verify()
+        window.addEventListener('focus', revalidate)
+        window.addEventListener('storage', revalidate)
+        document.addEventListener('visibilitychange', revalidate)
+        const timer = window.setInterval(revalidate, 60_000)
+        return () => {
+            active = false
+            window.clearInterval(timer)
+            window.removeEventListener('focus', revalidate)
+            window.removeEventListener('storage', revalidate)
+            document.removeEventListener('visibilitychange', revalidate)
+        }
     }, [router, pathname, retry])
 
     // Se for a página de login, renderiza apenas o conteúdo (sem sidebar)
@@ -55,7 +72,7 @@ export default function AdminLayout({
     }
 
     if (error) return <div className="p-8 space-y-4"><p role="alert">{error}</p><Button onClick={() => setRetry(r => r + 1)}>Tentar novamente</Button></div>
-    if (!session || verifiedPath !== pathname || !canAccessAdminPage(session.role, pathname)) return <p role="status" className="p-8 text-slate-500">Verificando acesso...</p>
+    if (!session || verifiedPath !== pathname || !canAccessAdminPage(session, pathname)) return <p role="status" className="p-8 text-slate-500">Verificando acesso...</p>
 
     const handleLogout = () => {
         localStorage.removeItem('admin-token')
@@ -72,12 +89,13 @@ export default function AdminLayout({
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
                     {[
+                        { href: '/admin/usuarios', label: 'Usuários e acessos', icon: Users },
                         { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
                         { href: '/admin/eventos', label: 'Eventos', icon: Calendar },
                         { href: '/admin/tipos-atividade', label: 'Tipos de Atividade', icon: Tags },
                         { href: '/admin/inscricoes/pendentes', label: 'Pendentes', icon: CreditCard },
                         { href: '/admin/financeiro', label: 'Financeiro', icon: CreditCard },
-                    ].filter(item => canAccessAdminPage(session.role, item.href)).map(({ href, label, icon: Icon }) => (
+                    ].filter(item => canAccessAdminPage(session, item.href)).map(({ href, label, icon: Icon }) => (
                         <Link key={href} href={href} className={`flex items-center gap-3 p-2 rounded transition ${pathname === href ? 'bg-slate-800 text-white' : 'hover:bg-slate-800'}`}>
                             <Icon size={20} /> {label}
                         </Link>
@@ -95,7 +113,7 @@ export default function AdminLayout({
                 <header className="h-16 bg-white border-b flex items-center px-8 justify-between shadow-sm">
                     <h2 className="font-semibold text-slate-700">Painel de Controle</h2>
                     <div className="flex items-center gap-4">
-                        <span className="text-sm text-slate-500">{session.nome} · {adminRoleLabels[session.role]}</span>
+                        <span className="text-sm text-slate-500">{session.nome} · {session.permissoes ? 'Acesso personalizado' : adminRoleLabels[session.role]}</span>
                     </div>
                 </header>
                 <div className="p-8">

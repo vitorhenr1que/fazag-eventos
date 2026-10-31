@@ -1,4 +1,6 @@
 'use client'
+import { canEditAdmin } from '@/lib/admin-permissions'
+import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -11,6 +13,7 @@ import Link from 'next/link'
 import { formatDate, formatForInput } from '@/lib/utils'
 
 export default function GerenciarSubeventosPage() {
+    const readOnly = !canEditAdmin(useAdminSession())
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
     const [subeventos, setSubeventos] = useState<any[]>([])
@@ -160,14 +163,14 @@ export default function GerenciarSubeventosPage() {
                             <ArrowLeft size={14} className="mr-1" /> Lista de Eventos
                         </Link>
                         <span className="text-slate-300">|</span>
-                        <Link href={`/admin/eventos/${params.id}/editar`} className="flex items-center text-xs text-slate-500 hover:text-primary">
+                        <Link href={`/admin/eventos/${params.id}/${readOnly ? "visualizar" : "editar"}`} className="flex items-center text-xs text-slate-500 hover:text-primary">
                             <Edit2 size={14} className="mr-1" /> Editar Evento Principal
                         </Link>
                     </div>
                     <h1 className="text-2xl font-bold">Subeventos: {evento?.nome || 'Carregando...'}</h1>
                     <p className="text-sm text-slate-500">Gerencie a programação e atividades específicas</p>
                 </div>
-                {!showForm && (
+                {!readOnly && !showForm && (
                     <Button onClick={() => setShowForm(true)}>
                         <Plus size={18} className="mr-2" /> Novo Subevento
                     </Button>
@@ -254,10 +257,10 @@ export default function GerenciarSubeventosPage() {
                                         <Users size={14} className="mr-2" /> Inscritos
                                     </Link>
                                 </Button>
-                                <Button variant="outline" size="sm" aria-label={`Editar ${sub.nome}`} onClick={() => startEdit(sub)}>
+                                <Button disabled={readOnly} variant="outline" size="sm" aria-label={`Editar ${sub.nome}`} onClick={() => startEdit(sub)}>
                                     <Edit2 size={14} />
                                 </Button>
-                                <Button variant="outline" size="sm" aria-label={`Excluir ${sub.nome}`} className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(sub.id)}>
+                                <Button disabled={readOnly} variant="outline" size="sm" aria-label={`Excluir ${sub.nome}`} className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(sub.id)}>
                                     < Trash2 size={14} />
                                 </Button>
                             </div>
@@ -268,7 +271,7 @@ export default function GerenciarSubeventosPage() {
                 {subeventos.length === 0 && !showForm && !erro && (
                     <div className="p-12 text-center border-2 border-dashed rounded-xl bg-slate-50">
                         <p className="text-slate-400">Nenhum subevento cadastrado.</p>
-                        <Button variant="link" onClick={() => setShowForm(true)}>Clique aqui para adicionar o primeiro</Button>
+                        <Button disabled={readOnly} variant="link" onClick={() => setShowForm(true)}>Clique aqui para adicionar o primeiro</Button>
                     </div>
                 )}
             </div>

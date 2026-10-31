@@ -1,4 +1,6 @@
 'use client'
+import { canEditAdmin } from '@/lib/admin-permissions'
+import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -29,6 +31,7 @@ const normalizar = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u
 const corresponde = (aluno: Aluno, busca: string) => normalizar(`${aluno.nome} ${aluno.id} ${aluno.email || ''}`).includes(normalizar(busca))
 
 export default function InscritosSubeventoPage() {
+    const readOnly = !canEditAdmin(useAdminSession())
     const { id: eventoId, subeventoId } = useParams<{ id: string; subeventoId: string }>()
     const [dados, setDados] = useState<Dados | null>(null)
     const [loading, setLoading] = useState(true)
@@ -90,14 +93,14 @@ export default function InscritosSubeventoPage() {
                 <h1 className="text-2xl font-bold">Inscritos{dados ? `: ${dados.subevento.nome}` : ' no subevento'}</h1>
                 {dados && <p className="mt-1 text-sm text-slate-500" aria-live="polite">{dados.inscritos.length} de {dados.subevento.totalVagas} vagas ocupadas</p>}
             </div>
-            <Button disabled={!dados || Boolean(processando) || Boolean(erro)} onClick={() => setMostrarAdicionar(!mostrarAdicionar)} aria-expanded={mostrarAdicionar} aria-controls="adicionar-aluno">
+            <Button disabled={readOnly || !dados || Boolean(processando) || Boolean(erro)} onClick={() => setMostrarAdicionar(!mostrarAdicionar)} aria-expanded={mostrarAdicionar} aria-controls="adicionar-aluno">
                 <Plus size={18} className="mr-2" /> {mostrarAdicionar ? 'Fechar inclusão' : 'Adicionar aluno'}
             </Button>
         </div>
 
         {erro && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             {erro}
-            <Button variant="link" disabled={Boolean(processando)} onClick={() => carregar().catch(error => setErro(error instanceof Error ? error.message : 'Erro de conexão'))}>Tentar novamente</Button>
+            <Button variant="link" disabled={readOnly || Boolean(processando)} onClick={() => carregar().catch(error => setErro(error instanceof Error ? error.message : 'Erro de conexão'))}>Tentar novamente</Button>
         </div>}
         {loading && <p role="status" className="flex items-center justify-center gap-2 p-12 text-slate-500"><Loader2 className="animate-spin" size={20} /> Carregando inscritos...</p>}
 
@@ -120,7 +123,7 @@ export default function InscritosSubeventoPage() {
                                     <p className="text-xs text-slate-500 break-words">{candidato.aluno.id}{candidato.aluno.email ? ` · ${candidato.aluno.email}` : ''}</p>
                                     {limiteAtingido && <p className="text-xs text-amber-800">Limite de subeventos atingido</p>}
                                 </div>
-                                <Button size="sm" variant="outline" disabled={lotado || limiteAtingido || Boolean(processando) || Boolean(erro)} aria-label={`Adicionar ${candidato.aluno.nome} ao subevento`} onClick={() => alterar(candidato.id, candidato.aluno.nome, 'POST')}>
+                                <Button size="sm" variant="outline" disabled={readOnly || lotado || limiteAtingido || Boolean(processando) || Boolean(erro)} aria-label={`Adicionar ${candidato.aluno.nome} ao subevento`} onClick={() => alterar(candidato.id, candidato.aluno.nome, 'POST')}>
                                     {processando === candidato.id ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Plus size={14} className="mr-2" />} Adicionar
                                 </Button>
                             </li>
@@ -150,7 +153,7 @@ export default function InscritosSubeventoPage() {
                                     <td className="p-3"><p className="font-semibold">{item.inscricao.aluno.nome}</p><p className="text-xs text-slate-500">{item.inscricao.aluno.id}</p>{item.inscricao.aluno.email && <p className="text-xs text-slate-500 break-all">{item.inscricao.aluno.email}</p>}</td>
                                     <td className="p-3"><p className="whitespace-nowrap">{formatDate(item.dataInscricao, 'dd/MM/yyyy HH:mm')}</p>{item.inscricao.status !== 'CONFIRMADA' && <p className="text-xs text-amber-800">Evento: {item.inscricao.status}</p>}</td>
                                     <td className="p-3"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${item.checkIn ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{item.checkIn ? 'Confirmada' : 'Não registrada'}</span></td>
-                                    <td className="p-3 text-right"><Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" disabled={Boolean(processando) || Boolean(erro)} aria-label={`Remover ${item.inscricao.aluno.nome} deste subevento`} onClick={() => alterar(item.inscricaoId, item.inscricao.aluno.nome, 'DELETE')}>
+                                    <td className="p-3 text-right"><Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" disabled={readOnly || Boolean(processando) || Boolean(erro)} aria-label={`Remover ${item.inscricao.aluno.nome} deste subevento`} onClick={() => alterar(item.inscricaoId, item.inscricao.aluno.nome, 'DELETE')}>
                                         {processando === item.inscricaoId ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Trash2 size={14} className="mr-2" />} Remover
                                     </Button></td>
                                 </tr>)}

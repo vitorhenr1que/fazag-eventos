@@ -18,16 +18,10 @@ export default function AdminDashboardPage() {
     useEffect(() => {
         async function loadStats() {
             try {
-                const res = await apiFetch('/api/eventos') // Usando o endpoint existente para simular stats
+                const res = await apiFetch('/api/admin/dashboard', { isAdmin: true })
                 if (res.ok) {
                     const json = await res.json()
-                    const total = json.data.length
-                    const inscricoes = json.data.reduce((acc: number, curr: any) => acc + (curr._count?.inscricoes || 0), 0)
-                    setStats({
-                        totalEventos: total,
-                        totalInscricoes: inscricoes,
-                        eventosAtivos: json.data.filter((e: any) => e.status === 'PUBLISHED').length
-                    })
+                    setStats(json.data)
                 }
             } finally {
                 setLoading(false)

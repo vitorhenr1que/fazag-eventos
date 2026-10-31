@@ -2,7 +2,7 @@ import { getAdminFromHeader } from '@/lib/auth-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { handleApiError } from '@/lib/app-error'
-import { hasAdminPermission } from '@/lib/admin-permissions'
+import { hasAdminPermission, canAdminAction } from '@/lib/admin-permissions'
 
 export async function GET(
     request: NextRequest,
@@ -41,11 +41,11 @@ export async function GET(
             }),
         }))
 
-        const data = hasAdminPermission(admin.role, 'FINANCEIRO') ? inscricoesComSubeventos : inscricoesComSubeventos.map(inscricao => {
+        const data = hasAdminPermission(admin, 'FINANCEIRO') ? inscricoesComSubeventos : inscricoesComSubeventos.map(inscricao => {
             const { valorReferencia, valorPago, valorDesconto, situacaoFinanceira, dataPagamento, dataTransferencia, reservaPixId, aprovadoPor, observacaoFinanceira, ...operacional } = inscricao
-            return operacional
+            return canAdminAction(admin, 'EXCLUIR_INSCRICAO') ? { ...operacional, situacaoFinanceira, valorPago } : operacional
         })
-        const exclusoesEmProcessamento = hasAdminPermission(admin.role, 'ADMINISTRADOR')
+        const exclusoesEmProcessamento = canAdminAction(admin, 'EXCLUIR_INSCRICAO')
             ? await prisma.exclusaoInscricao.findMany({ where: { eventoId: id, estado: 'PROCESSANDO' }, select: { inscricaoOriginalId: true, alunoNome: true, modalidade: true } }) : []
         return NextResponse.json({ success: true, count: inscricoes.length, data, exclusoesEmProcessamento }, { headers: { 'Cache-Control': 'no-store' } })
     } catch (error) {
