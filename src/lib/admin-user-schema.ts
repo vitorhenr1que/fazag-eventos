@@ -5,7 +5,7 @@ export const userPermissionsSchema = z.object({
     eventos: z.enum(['TODOS', 'PUBLICADOS', 'ESPECIFICOS']),
     eventoIds: z.array(z.string().min(1).max(25)).max(500),
     acesso: z.enum(['VISUALIZAR', 'EDITAR', 'PERSONALIZAR']),
-    acoes: z.array(z.enum(['CHECKIN_SUBEVENTO', 'LIBERAR_CERTIFICADO', 'CHECKIN_GERAL', 'EXCLUIR_INSCRICAO'])).max(4).optional(),
+    acoes: z.array(z.enum(['CHECKIN_SUBEVENTO', 'REMOVER_CHECKIN_SUBEVENTO', 'LIBERAR_CERTIFICADO', 'EXCLUIR_CERTIFICADO', 'CHECKIN_GERAL', 'REMOVER_CHECKIN_GERAL', 'EXCLUIR_INSCRICAO'])).max(7).optional(),
 }).strict().superRefine((data, ctx) => {
     if (data.eventos === 'ESPECIFICOS' && !data.eventoIds.length) ctx.addIssue({ code: 'custom', path: ['eventoIds'], message: 'Selecione ao menos um evento.' })
 })

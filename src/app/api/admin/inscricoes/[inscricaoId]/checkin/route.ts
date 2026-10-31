@@ -6,6 +6,16 @@ import { adminCheckinSchema } from '@/lib/admin-checkin'
 
 const inscricaoService = new InscricaoService()
 
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ inscricaoId: string }> }) {
+    try {
+        await getAdminFromHeader(request)
+        const { inscricaoId } = await params
+        const body = adminCheckinSchema.parse(await request.json())
+        const result = await inscricaoService.adminRemoverCheckIn(inscricaoId, body.tipo, body.subeventoId)
+        return NextResponse.json({ success: true, data: result })
+    } catch (error) { return handleApiError(error) }
+}
+
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ inscricaoId: string }> }

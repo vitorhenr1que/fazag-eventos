@@ -1,5 +1,5 @@
 'use client'
-import { canEditAdmin } from '@/lib/admin-permissions'
+import { canEditAdmin, canAccessAdminPage } from '@/lib/admin-permissions'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import { useEffect, useRef, useState } from 'react'
@@ -21,7 +21,13 @@ const moeda = (valor: string | null) => valor === null ? 'Não definido' : `R$ $
 const normalizarNome = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
 
 export default function InscricoesPendentesPage() {
-    const readOnly = !canEditAdmin(useAdminSession())
+    const session = useAdminSession()
+    const readOnly = !canEditAdmin(session)
+    const [eventos, setEventos] = useState<{ id: string; nome: string }[]>([])
+    const [eventoId, setEventoId] = useState('')
+    const [initialized, setInitialized] = useState(false)
+    const [erro, setErro] = useState('')
+    const [revisao, setRevisao] = useState(0)
     const [pendentes, setPendentes] = useState<Pendente[]>([])
     const [busca, setBusca] = useState('')
     const [loading, setLoading] = useState(true)
@@ -37,25 +43,33 @@ export default function InscricoesPendentesPage() {
 
     useEffect(() => { if (alvo) dialogRef.current?.showModal(); else dialogRef.current?.close() }, [alvo])
     useEffect(() => {
+        setEventoId(new URLSearchParams(window.location.search).get('eventoId') || '')
+        setInitialized(true)
+    }, [])
+    useEffect(() => {
+        if (!initialized) return
         let ativo = true
+        const controller = new AbortController()
+        setLoading(true); setErro(''); setPendentes([]); setAlvo(null)
         async function carregar() {
             try {
-                const res = await apiFetch('/api/admin/inscricoes/pendentes', { isAdmin: true })
+                const res = await apiFetch(`/api/admin/inscricoes/pendentes${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ''}`, { isAdmin: true, signal: controller.signal, cache: 'no-store' })
                 const json = await res.json()
                 if (!res.ok) throw new Error(json.error?.message || 'Não foi possível carregar as inscrições')
                 if (ativo) {
+                    setEventos(json.eventos)
                     setPendentes(json.data); setAgora(json.serverNow)
                     relogioRef.current = { servidor: json.serverNow, local: performance.now() }
                     const id = new URLSearchParams(window.location.search).get('inscricaoId')
                     const selecionada = json.data.find((i: Pendente) => i.id === id)
                     if (selecionada) setAlvo(selecionada)
                 }
-            } catch (error) { if (ativo) toast.error(error instanceof Error ? error.message : 'Erro de conexão') }
+            } catch (error) { if (ativo) setErro(error instanceof Error ? error.message : 'Erro de conexão') }
             finally { if (ativo) setLoading(false) }
         }
         carregar()
-        return () => { ativo = false }
-    }, [])
+        return () => { ativo = false; controller.abort() }
+    }, [initialized, eventoId, revisao])
     useEffect(() => {
         const timer = setInterval(() => {
             const relogio = relogioRef.current
@@ -110,12 +124,20 @@ export default function InscricoesPendentesPage() {
     return <div className="space-y-6">
         <h1 className="text-3xl font-bold">Aprovações Pendentes</h1>
         <p className="text-sm text-slate-600">Confira o comprovante recebido pelo WhatsApp do financeiro: +55 75 98218-1138. A aprovação usa o valor da reserva selecionada, inclusive vencida, ou o preço atual quando não houver reserva. O Pix estático copiado continua utilizável no banco após o vencimento.</p>
-        <Link href="/admin/financeiro" className="text-blue-700 underline">Ver relatório financeiro</Link>
-        <div className="max-w-md space-y-2">
+        {canAccessAdminPage(session, '/admin/financeiro') && <Link href={eventoId ? `/admin/financeiro?eventoId=${encodeURIComponent(eventoId)}` : '/admin/financeiro'} className="text-blue-700 underline">Ver relatório financeiro</Link>}
+        <div className="max-w-xl space-y-2">
+            <label htmlFor="evento-pendentes" className="block text-sm font-medium">Evento</label>
+            <select id="evento-pendentes" className="w-full rounded-lg border bg-white p-3" value={eventoId} disabled={processing} onChange={e => { setEventoId(e.target.value); setBusca(''); setPendentes([]); setAlvo(null) }}>
+                <option value="">Selecione um evento</option>
+                {eventos.map(evento => <option key={evento.id} value={evento.id}>{evento.nome}</option>)}
+            </select>
+        </div>
+        {erro && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">{erro} <Button variant="link" onClick={() => setRevisao(value => value + 1)}>Tentar novamente</Button></div>}
+        {eventoId && !erro && <div className="max-w-md space-y-2">
             <label htmlFor="busca-aluno" className="block text-sm font-medium">Buscar pelo nome do aluno</label>
             <Input id="busca-aluno" type="search" placeholder="Digite o nome do aluno..." value={busca} onChange={e => setBusca(e.target.value)} />
-        </div>
-        {loading ? <p role="status">Carregando...</p> : <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full text-left text-sm">
+        </div>}
+        {loading ? <p role="status">Carregando...</p> : !erro && (!eventoId ? <p className="rounded-xl border bg-white p-8 text-center text-slate-500">{eventos.length ? 'Selecione um evento para visualizar as aprovações pendentes.' : 'Nenhum evento disponível para o seu usuário.'}</p> : <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full text-left text-sm">
             <thead className="bg-slate-50"><tr>{['Aluno', 'Evento / preço atual', 'Reservas Pix', 'Solicitação', 'Conferência'].map(t => <th key={t} scope="col" className="p-4">{t}</th>)}</tr></thead>
             <tbody className="divide-y">{pendentesFiltrados.map(p => <tr key={p.id}>
                 <td className="p-4">{p.aluno.nome}<p className="text-xs text-slate-500">{p.aluno.id}</p></td>
@@ -123,7 +145,7 @@ export default function InscricoesPendentesPage() {
                 <td className="p-4">{reservas(p)}</td><td className="p-4">{data(p.dataInscricao)}</td>
                 <td className="p-4"><Button size="sm" disabled={readOnly || processing || p.evento._count.inscricoes >= p.evento.totalVagas} onClick={() => abrir(p)}>Aprovar</Button></td>
             </tr>)}{pendentesFiltrados.length === 0 && <tr><td colSpan={5} className="p-10 text-center">{pendentes.length === 0 ? 'Nenhuma aprovação pendente.' : 'Nenhum aluno encontrado para esta busca.'}</td></tr>}</tbody>
-        </table></div>}
+        </table></div>)}
         <dialog ref={dialogRef} aria-labelledby="conferencia-titulo" className="m-auto w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl p-6 backdrop:bg-slate-900/50"
             onCancel={e => { if (processing) e.preventDefault(); else setAlvo(null) }}>
             {alvo && <form className="space-y-4" onSubmit={e => { e.preventDefault(); aprovar() }}>

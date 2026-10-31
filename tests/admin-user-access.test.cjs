@@ -151,6 +151,9 @@ test('edição preserva senha omitida e impede desativar ou rebaixar a própria 
 
 const customConfig = (acoes, values = {}) => ({ areas: ['eventos'], eventos: 'ESPECIFICOS', eventoIds: ['event-1'], acesso: 'PERSONALIZAR', acoes, ...values })
 const operations = [
+    { action: 'REMOVER_CHECKIN_SUBEVENTO', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'SUBEVENTO', subeventoId: 'sub-1' } },
+    { action: 'REMOVER_CHECKIN_GERAL', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
+    { action: 'EXCLUIR_CERTIFICADO', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/certificado' },
     { action: 'CHECKIN_SUBEVENTO', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'SUBEVENTO', subeventoId: 'sub-1' } },
     { action: 'LIBERAR_CERTIFICADO', path: '/api/admin/inscricoes/reg-1/certificado', body: { cargaHoraria: 4 } },
     { action: 'CHECKIN_GERAL', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
@@ -163,7 +166,7 @@ test('modo Personalizar concede cada ação de forma independente, na interface 
         assert.equal(permissions.canEditAdmin(admin), false)
         for (const operation of operations) {
             assert.equal(permissions.canAdminAction(admin, operation.action), operation.action === selected.action)
-            const request = call(operation.path, 'POST', operation.permission, operation.body)
+            const request = call(operation.path, operation.method || 'POST', operation.permission, operation.body)
             if (operation.action === selected.action) await request
             else await assert.rejects(request, forbidden)
         }
@@ -173,20 +176,20 @@ test('modo Personalizar concede cada ação de forma independente, na interface 
 test('ações personalizadas respeitam área, evento e revogação em sessão aberta', async () => {
     const { call, admin } = environment({ permissoes: customConfig(Object.keys(permissions.adminActions)) })
     for (const operation of operations) {
-        await assert.rejects(call(operation.path.replace('reg-1', 'reg-2'), 'POST', operation.permission, operation.body), forbidden)
+        await assert.rejects(call(operation.path.replace('reg-1', 'reg-2'), operation.method || 'POST', operation.permission, operation.body), forbidden)
     }
     admin.permissoes.areas = []
     for (const operation of operations) {
         assert.equal(permissions.canAdminAction(admin, operation.action), false)
-        await assert.rejects(call(operation.path, 'POST', operation.permission, operation.body), forbidden)
+        await assert.rejects(call(operation.path, operation.method || 'POST', operation.permission, operation.body), forbidden)
     }
     admin.permissoes.areas = ['eventos']
     admin.permissoes.acoes = []
-    for (const operation of operations) await assert.rejects(call(operation.path, 'POST', operation.permission, operation.body), forbidden)
+    for (const operation of operations) await assert.rejects(call(operation.path, operation.method || 'POST', operation.permission, operation.body), forbidden)
 })
 
 test('Personalizar não concede edição geral, exclusão de certificado, financeiro ou gestão de usuários', async () => {
-    const { call, admin } = environment({ permissoes: customConfig(Object.keys(permissions.adminActions), { areas: ['eventos', 'financeiro', 'pendentes', 'tiposAtividade'] }) })
+    const { call, admin } = environment({ permissoes: customConfig(['CHECKIN_SUBEVENTO', 'CHECKIN_GERAL', 'LIBERAR_CERTIFICADO', 'EXCLUIR_INSCRICAO'], { areas: ['eventos', 'financeiro', 'pendentes', 'tiposAtividade'] }) })
     assert.equal(permissions.canAccessAdminPage(admin, '/admin/eventos/event-1/editar'), false)
     assert.equal(permissions.canCreateEvento(admin), false)
     for (const [path, method, permission, body] of [
@@ -205,12 +208,12 @@ test('Somente visualizar ignora ações armazenadas e Visualizar e editar manté
     const read = environment({ permissoes: customConfig(Object.keys(permissions.adminActions), { acesso: 'VISUALIZAR' }) })
     for (const operation of operations) {
         assert.equal(permissions.canAdminAction(read.admin, operation.action), false)
-        await assert.rejects(read.call(operation.path, 'POST', operation.permission, operation.body), forbidden)
+        await assert.rejects(read.call(operation.path, operation.method || 'POST', operation.permission, operation.body), forbidden)
     }
     const edit = environment({ permissoes: customConfig([], { acesso: 'EDITAR' }) })
     for (const operation of operations.filter(operation => operation.action !== 'EXCLUIR_INSCRICAO')) {
         assert.equal(permissions.canAdminAction(edit.admin, operation.action), true)
-        await edit.call(operation.path, 'POST', operation.permission, operation.body)
+        await edit.call(operation.path, operation.method || 'POST', operation.permission, operation.body)
     }
     assert.equal(permissions.canAdminAction(edit.admin, 'EXCLUIR_INSCRICAO'), false)
     await assert.rejects(edit.call('/api/admin/inscricoes/reg-1/excluir', 'POST', 'EXCLUIR_INSCRICAO', { modalidade: 'EXCLUIR_TUDO' }), forbidden)
@@ -241,7 +244,7 @@ test('coluna Subeventos (Grade) não mostra ação de check-in quando só o gera
     const { renderToStaticMarkup } = require('react-dom/server')
     const env = environment({ permissoes: customConfig(['CHECKIN_GERAL']) })
     const { SubeventoCheckin } = env.load('components/admin/SubeventoCheckin.tsx')
-    const render = (presente = false) => renderToStaticMarkup(React.createElement(SubeventoCheckin, { session: env.admin, presente, onCheckin: () => {} }))
+    const render = (presente = false) => renderToStaticMarkup(React.createElement(SubeventoCheckin, { session: env.admin, presente, onCheckin: () => {}, onRemove: () => {} }))
     assert.match(render(), /Ausente/)
     assert.doesNotMatch(render(), /<button|Check-in/)
     env.admin.permissoes.acoes = ['CHECKIN_SUBEVENTO']
@@ -269,4 +272,92 @@ test('rota real bloqueia check-in na grade sem gravar e permite somente presenç
     const allowed = await route.POST(request({ tipo: 'EVENTO' }), params)
     assert.equal(allowed.status, 200)
     assert.deepEqual(writes, [{ inscricaoId: 'reg-1' }])
+})
+
+test('remover check-in geral ou de subevento apaga apenas a presença selecionada e é repetível', async () => {
+    const env = environment({ permissoes: customConfig(['REMOVER_CHECKIN_GERAL', 'REMOVER_CHECKIN_SUBEVENTO']) })
+    let records = [
+        { id: 'geral', inscricaoId: 'reg-1' },
+        { id: 'grade', inscricaoSubeventoId: 'link-1' },
+        { id: 'outra-grade', inscricaoSubeventoId: 'link-2' },
+        { id: 'outro-aluno', inscricaoId: 'reg-2' },
+    ]
+    env.db.$transaction = async callback => callback({ $queryRaw: async () => [{ adquirido: 1 }] })
+    env.db.inscricaoSubevento = { findUnique: async ({ where }) => where.inscricaoId_subeventoId.subeventoId === 'sub-1' ? { id: 'link-1' } : null }
+    env.db.checkIn = { deleteMany: async ({ where }) => {
+        const original = records.length
+        records = records.filter(record => !Object.entries(where).every(([key, value]) => record[key] === value))
+        return { count: original - records.length }
+    } }
+    const auth = env.load('lib/auth-admin.ts')
+    const token = auth.adminAuth.signToken({ id: env.admin.id, role: env.admin.role })
+    const route = env.load('app/api/admin/inscricoes/[inscricaoId]/checkin/route.ts')
+    const request = body => new Request('http://localhost/api/admin/inscricoes/reg-1/checkin', { method: 'DELETE', headers: { authorization: 'Bearer ' + token }, body: JSON.stringify(body) })
+    const params = { params: Promise.resolve({ inscricaoId: 'reg-1' }) }
+    assert.equal((await route.DELETE(request({ tipo: 'EVENTO' }), params)).status, 200)
+    assert.deepEqual(records.map(record => record.id), ['grade', 'outra-grade', 'outro-aluno'])
+    assert.equal((await route.DELETE(request({ tipo: 'EVENTO' }), params)).status, 200)
+    assert.equal((await route.DELETE(request({ tipo: 'SUBEVENTO', subeventoId: 'sub-1' }), params)).status, 200)
+    assert.deepEqual(records.map(record => record.id), ['outra-grade', 'outro-aluno'])
+    assert.equal((await route.DELETE(request({ tipo: 'SUBEVENTO', subeventoId: 'sub-2' }), params)).status, 403)
+    assert.deepEqual(records.map(record => record.id), ['outra-grade', 'outro-aluno'])
+})
+
+test('botão de remover check-in em subeventos exige permissão própria e presença existente', () => {
+    const React = require('react')
+    const { renderToStaticMarkup } = require('react-dom/server')
+    const env = environment({ permissoes: customConfig(['CHECKIN_SUBEVENTO']) })
+    const { SubeventoCheckin } = env.load('components/admin/SubeventoCheckin.tsx')
+    const render = presente => renderToStaticMarkup(React.createElement(SubeventoCheckin, { session: env.admin, presente, onCheckin: () => {}, onRemove: () => {} }))
+    assert.doesNotMatch(render(true), /<button/)
+    env.admin.permissoes.acoes = ['REMOVER_CHECKIN_SUBEVENTO']
+    assert.match(render(true), /Remover check-in/)
+    assert.doesNotMatch(render(false), /<button/)
+    env.admin.permissoes.acoes = []
+    assert.doesNotMatch(render(true), /<button/)
+})
+
+test('liberar certificado não permite excluir; exclusão autorizada remove somente o certificado da inscrição', async () => {
+    const env = environment({ permissoes: customConfig(['LIBERAR_CERTIFICADO']) })
+    const deleted = []
+    env.db.certificado = { deleteMany: async ({ where }) => { deleted.push(where); return { count: 1 } } }
+    const auth = env.load('lib/auth-admin.ts')
+    const token = auth.adminAuth.signToken({ id: env.admin.id, role: env.admin.role })
+    const route = env.load('app/api/admin/inscricoes/[inscricaoId]/certificado/route.ts')
+    const request = () => new Request('http://localhost/api/admin/inscricoes/reg-1/certificado', { method: 'DELETE', headers: { authorization: 'Bearer ' + token } })
+    const params = { params: Promise.resolve({ inscricaoId: 'reg-1' }) }
+    assert.equal((await route.DELETE(request(), params)).status, 403)
+    assert.deepEqual(deleted, [])
+    env.admin.permissoes.acoes = ['EXCLUIR_CERTIFICADO']
+    assert.equal((await route.DELETE(request(), params)).status, 200)
+    assert.deepEqual(deleted, [{ inscricaoId: 'reg-1' }])
+})
+
+test('Pendentes exige selecionar evento, filtra a consulta e bloqueia evento não autorizado', async () => {
+    const { NextRequest } = require('next/server')
+    const env = environment({ permissoes: customConfig([], { areas: ['pendentes'], acesso: 'EDITAR' }) })
+    const queries = []
+    env.db.evento.findMany = async ({ where }) => {
+        assert.deepEqual(where, { id: { in: ['event-1'] } })
+        return [{ id: 'event-1', nome: 'Evento permitido' }]
+    }
+    env.db.inscricao.findMany = async ({ where }) => { queries.push(where); return [{ id: 'reg-1', eventoId: where.eventoId, aluno: { nome: 'Aluno' } }] }
+    env.db.reservaPix = { findMany: async () => [] }
+    const auth = env.load('lib/auth-admin.ts')
+    const token = auth.adminAuth.signToken({ id: env.admin.id, role: env.admin.role })
+    const route = env.load('app/api/admin/inscricoes/pendentes/route.ts')
+    const request = (query = '') => new NextRequest('http://localhost/api/admin/inscricoes/pendentes' + query, { headers: { authorization: 'Bearer ' + token } })
+    const initial = await route.GET(request())
+    assert.equal(initial.status, 200)
+    const json = await initial.json()
+    assert.deepEqual(json.data, [])
+    assert.deepEqual(json.eventos, [{ id: 'event-1', nome: 'Evento permitido' }])
+    assert.equal(queries.length, 0)
+    const selected = await route.GET(request('?eventoId=event-1'))
+    assert.equal(selected.status, 200)
+    assert.equal((await selected.json()).data[0].eventoId, 'event-1')
+    assert.deepEqual(queries, [{ status: 'PENDENTE', eventoId: 'event-1', evento: { id: { in: ['event-1'] } } }])
+    const denied = await route.GET(request('?eventoId=event-2'))
+    assert.equal(denied.status, 403)
+    assert.equal(queries.length, 1)
 })

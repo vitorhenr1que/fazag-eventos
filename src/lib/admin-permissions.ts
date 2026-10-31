@@ -2,8 +2,11 @@ export type AdminRole = 'ADMIN' | 'SUPER_ADMIN' | 'NUPPEX' | 'FINANCEIRO'
 export type AdminPermission = 'GESTAO' | 'FINANCEIRO' | 'SESSAO' | 'ADMINISTRADOR' | 'EXCLUIR_INSCRICAO'
 export const adminActions = {
     CHECKIN_SUBEVENTO: 'Fazer check-in em subeventos',
+    REMOVER_CHECKIN_SUBEVENTO: 'Remover check-in em subeventos',
     LIBERAR_CERTIFICADO: 'Liberar certificado',
+    EXCLUIR_CERTIFICADO: 'Excluir certificado',
     CHECKIN_GERAL: 'Fazer check-in geral',
+    REMOVER_CHECKIN_GERAL: 'Remover check-in geral',
     EXCLUIR_INSCRICAO: 'Excluir inscrição',
 } as const
 export type AdminAction = keyof typeof adminActions

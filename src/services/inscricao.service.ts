@@ -162,6 +162,24 @@ export class InscricaoService {
         }
     }
 
+    async adminRemoverCheckIn(inscricaoId: string, tipo: 'EVENTO' | 'SUBEVENTO', subeventoId?: string) {
+        const inscricao = await prisma.inscricao.findUnique({ where: { id: inscricaoId }, select: { eventoId: true } })
+        if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
+        return comLockFinanceiro(inscricao.eventoId, async tx => {
+            if (tipo === 'EVENTO') {
+                return tx.checkIn.deleteMany({ where: { inscricaoId } })
+            }
+            if (!subeventoId) throw new AppError('Informe o subevento', 400)
+            const subevento = await tx.subevento.findUnique({ where: { id: subeventoId }, select: { eventoId: true } })
+            if (!subevento || subevento.eventoId !== inscricao.eventoId) throw new AppError('Subevento não pertence ao evento da inscrição', 404)
+            const vinculo = await tx.inscricaoSubevento.findUnique({
+                where: { inscricaoId_subeventoId: { inscricaoId, subeventoId } }, select: { id: true },
+            })
+            if (!vinculo) throw new AppError('Aluno não inscrito neste subevento', 404)
+            return tx.checkIn.deleteMany({ where: { inscricaoSubeventoId: vinculo.id } })
+        })
+    }
+
     async realizarCheckInSubevento(inscricaoId: string, subeventoId: string, ignoreTimeWindow = false) {
         const subevento = await prisma.subevento.findUnique({ where: { id: subeventoId }, select: { eventoId: true } })
         if (!subevento) throw new AppError('Subevento não encontrado', 404)

@@ -54,15 +54,17 @@ async function authorizeAdminRequest(request: Request, session: AdminSession) {
     const fail = () => { throw new AppError('Você não tem permissão para esta ação.', 403, 'FORBIDDEN') }
     let checkinSubId: string | undefined
     if (write && !canEditAdmin(session)) {
-        if (session.permissoes?.acesso !== 'PERSONALIZAR' || request.method !== 'POST') fail()
+        if (session.permissoes?.acesso !== 'PERSONALIZAR' || !['POST', 'DELETE'].includes(request.method)) fail()
         let action: AdminAction | undefined
         const operation = path.match(/^\/api\/admin\/inscricoes\/[^/]+\/(checkin|certificado|excluir)$/)?.[1]
         if (operation === 'checkin') {
             const body = adminCheckinSchema.parse(await request.clone().json())
-            action = body.tipo === 'SUBEVENTO' ? 'CHECKIN_SUBEVENTO' : 'CHECKIN_GERAL'
+            action = request.method === 'DELETE'
+                ? body.tipo === 'SUBEVENTO' ? 'REMOVER_CHECKIN_SUBEVENTO' : 'REMOVER_CHECKIN_GERAL'
+                : body.tipo === 'SUBEVENTO' ? 'CHECKIN_SUBEVENTO' : 'CHECKIN_GERAL'
             if (body.tipo === 'SUBEVENTO') checkinSubId = body.subeventoId
-        } else if (operation === 'certificado') action = 'LIBERAR_CERTIFICADO'
-        else if (operation === 'excluir') action = 'EXCLUIR_INSCRICAO'
+        } else if (operation === 'certificado') action = request.method === 'DELETE' ? 'EXCLUIR_CERTIFICADO' : 'LIBERAR_CERTIFICADO'
+        else if (operation === 'excluir' && request.method === 'POST') action = 'EXCLUIR_INSCRICAO'
         if (!action || !canAdminAction(session, action)) fail()
     }
     if (path.startsWith('/api/admin/usuarios')) {

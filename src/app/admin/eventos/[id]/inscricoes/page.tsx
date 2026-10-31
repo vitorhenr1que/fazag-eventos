@@ -24,7 +24,12 @@ export default function InscricoesEventoPage() {
     const readOnly = !canEditAdmin(session)
     const canCheckinSub = canAdminAction(session, 'CHECKIN_SUBEVENTO')
     const canCheckinGeral = canAdminAction(session, 'CHECKIN_GERAL')
+    const canRemoveCheckinSub = canAdminAction(session, 'REMOVER_CHECKIN_SUBEVENTO')
+    const canRemoveCheckinGeral = canAdminAction(session, 'REMOVER_CHECKIN_GERAL')
     const canReleaseCertificate = canAdminAction(session, 'LIBERAR_CERTIFICADO')
+    const canDeleteCertificate = canAdminAction(session, 'EXCLUIR_CERTIFICADO')
+    const showSubeventColumn = canCheckinSub || canRemoveCheckinSub
+    const showCertificateColumn = canReleaseCertificate || canDeleteCertificate
     const canDelete = canAdminAction(session, 'EXCLUIR_INSCRICAO')
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
@@ -36,6 +41,7 @@ export default function InscricoesEventoPage() {
     const paginaAtual = Math.min(pagina, Math.max(1, Math.ceil(inscricoesFiltradas.length / ITENS_POR_PAGINA)))
     const inscricoesPaginadas = inscricoesFiltradas.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
     const [loading, setLoading] = useState(true)
+    const [processingCheckin, setProcessingCheckin] = useState(false)
     const [erro, setErro] = useState('')
     const [tentativa, setTentativa] = useState(0)
     const [exporting, setExporting] = useState<string | null>(null)
@@ -83,7 +89,8 @@ export default function InscricoesEventoPage() {
     }, [params.id, tentativa])
 
     async function handleCheckInSub(inscricaoId: string, subeventoId: string) {
-        if (!canCheckinSub) return
+        if (!canCheckinSub || processingCheckin) return
+        setProcessingCheckin(true)
         try {
             const res = await apiFetch(`/api/admin/inscricoes/${inscricaoId}/checkin`, {
                 method: 'POST',
@@ -102,10 +109,12 @@ export default function InscricoesEventoPage() {
             }
         } catch (err) {
             toast.error('Erro ao processar check-in')
-        }
+        } finally { setProcessingCheckin(false) }
     }
 
     async function handleCheckIn(inscricaoId: string) {
+        if (!canCheckinGeral || processingCheckin) return
+        setProcessingCheckin(true)
         try {
             const res = await apiFetch(`/api/admin/inscricoes/${inscricaoId}/checkin`, {
                 method: 'POST',
@@ -115,16 +124,34 @@ export default function InscricoesEventoPage() {
             if (res.ok) {
                 toast.success('Check-in realizado com sucesso!')
                 setInscricoes(prev => prev.map(i => i.id === inscricaoId ? { ...i, checkIn: { id: 'temp' } } : i))
+            } else {
+                const json = await res.json()
+                toast.error(json.error?.message || 'Não foi possível fazer check-in')
             }
         } catch (err) {
             toast.error('Erro ao processar check-in')
-        }
+        } finally { setProcessingCheckin(false) }
+    }
+
+    async function handleRemoverCheckIn(inscricaoId: string, subeventoId?: string) {
+        if (processingCheckin || !(subeventoId ? canRemoveCheckinSub : canRemoveCheckinGeral)) return
+        setProcessingCheckin(true)
+        try {
+            const res = await apiFetch(`/api/admin/inscricoes/${inscricaoId}/checkin`, {
+                isAdmin: true, method: 'DELETE', body: JSON.stringify({ tipo: subeventoId ? 'SUBEVENTO' : 'EVENTO', subeventoId }),
+            })
+            const json = await res.json()
+            if (!res.ok) throw new Error(json.error?.message || 'Não foi possível remover o check-in')
+            await atualizarInscricoes()
+            toast.success('Check-in removido')
+        } catch (error) { toast.error(error instanceof Error ? error.message : 'Erro ao remover check-in') }
+        finally { setProcessingCheckin(false) }
     }
 
     const [emittingId, setEmittingId] = useState<string | null>(null)
 
     function handleAprovarPagamento(inscricaoId: string) {
-        window.location.assign(`/admin/inscricoes/pendentes?inscricaoId=${encodeURIComponent(inscricaoId)}`)
+        window.location.assign(`/admin/inscricoes/pendentes?eventoId=${encodeURIComponent(String(params.id))}&inscricaoId=${encodeURIComponent(inscricaoId)}`)
     }
 
     async function handleEmitirCertificado(inscricaoId: string, atualCarga?: number) {
@@ -172,6 +199,7 @@ export default function InscricoesEventoPage() {
     }
 
     async function handleExcluirCertificado(inscricaoId: string) {
+        if (!canDeleteCertificate || emittingId) return
         const confirmar = confirm('Tem certeza que deseja excluir o certificado deste inscrito? O aluno poderá gerar um novo certificado se cumprir os requisitos.')
         if (!confirmar) return
 
@@ -531,8 +559,8 @@ export default function InscricoesEventoPage() {
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Inscrição</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Status</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Presença Geral</th>
-                                    {canCheckinSub && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Subeventos (Grade)</th>}
-                                    {canReleaseCertificate && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Certificado</th>}
+                                    {showSubeventColumn && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Subeventos (Grade)</th>}
+                                    {showCertificateColumn && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Certificado</th>}
                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-right">Ação</th>
                                 </tr>
                             </thead>
@@ -547,8 +575,8 @@ export default function InscricoesEventoPage() {
                                             <td className="px-6 py-4"><Skeleton className="h-4 w-20 mx-auto" /></td>
                                             <td className="px-6 py-4"><Skeleton className="h-5 w-24 mx-auto" /></td>
                                             <td className="px-6 py-4"><Skeleton className="h-5 w-20 mx-auto" /></td>
-                                            {canCheckinSub && <td className="px-6 py-4"><Skeleton className="h-10 w-full" /></td>}
-                                            {canReleaseCertificate && <td className="px-6 py-4"><Skeleton className="h-5 w-20 mx-auto" /></td>}
+                                            {showSubeventColumn && <td className="px-6 py-4"><Skeleton className="h-10 w-full" /></td>}
+                                            {showCertificateColumn && <td className="px-6 py-4"><Skeleton className="h-5 w-20 mx-auto" /></td>}
                                             <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-24 ml-auto" /></td>
                                         </tr>
                                     ))
@@ -588,7 +616,7 @@ export default function InscricoesEventoPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            {canCheckinSub && <td className="px-6 py-4">
+                                            {showSubeventColumn && <td className="px-6 py-4">
                                                 {insc.subeventosEscolhidos?.length > 0 ? (
                                                     <div className="space-y-1">
                                                         {insc.subeventosEscolhidos.map((se: any) => (
@@ -596,7 +624,7 @@ export default function InscricoesEventoPage() {
                                                                 <span className="truncate max-w-[120px]" title={se.subevento.nome}>
                                                                     {se.subevento.nome}
                                                                 </span>
-                                                                <SubeventoCheckin session={session} presente={Boolean(se.checkIn)} onCheckin={() => handleCheckInSub(insc.id, se.subeventoId)} />
+                                                                <SubeventoCheckin session={session} presente={Boolean(se.checkIn)} processing={processingCheckin} onCheckin={() => handleCheckInSub(insc.id, se.subeventoId)} onRemove={() => handleRemoverCheckIn(insc.id, se.subeventoId)} />
                                                             </div>
                                                         ))}
                                                     </div>
@@ -606,30 +634,30 @@ export default function InscricoesEventoPage() {
                                                     </span>
                                                 )}
                                             </td>}
-                                            {canReleaseCertificate && <td className="px-6 py-4">
+                                            {showCertificateColumn && <td className="px-6 py-4">
                                                 <div className="flex flex-col items-center gap-1">
                                                     {insc.certificado ? (
                                                         <>
                                                             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                                                                 {insc.certificado.cargaHorariaTotal}h
                                                             </span>
-                                                            <button
+                                                            {canReleaseCertificate && <button
                                                                 onClick={() => handleEmitirCertificado(insc.id, insc.certificado.cargaHorariaTotal)}
                                                                 className="text-[10px] text-slate-500 hover:underline"
                                                                 disabled={!canReleaseCertificate || emittingId === insc.id}
                                                             >
                                                                 Editar Carga
-                                                            </button>
-                                                            <button
+                                                            </button>}
+                                                            {canDeleteCertificate && <button
                                                                 onClick={() => handleExcluirCertificado(insc.id)}
                                                                 className="inline-flex items-center gap-1 text-[10px] text-red-600 hover:underline disabled:opacity-50"
-                                                                disabled={readOnly || emittingId === insc.id}
+                                                                disabled={emittingId === insc.id}
                                                             >
                                                                 {emittingId === insc.id ? <Loader2 className="animate-spin" size={10} /> : <Trash2 size={10} />}
-                                                                Excluir
-                                                            </button>
+                                                                Excluir certificado
+                                                            </button>}
                                                         </>
-                                                    ) : (
+                                                    ) : canReleaseCertificate ? (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
@@ -639,7 +667,7 @@ export default function InscricoesEventoPage() {
                                                         >
                                                             {emittingId === insc.id ? <Loader2 className="animate-spin" size={12} /> : 'Liberar'}
                                                         </Button>
-                                                    )}
+                                                    ) : <span className="text-xs text-slate-400">Não liberado</span>}
                                                 </div>
                                             </td>}
                                             <td className="px-6 py-4 text-right space-x-2">
@@ -654,10 +682,11 @@ export default function InscricoesEventoPage() {
                                                     </Button>
                                                 )}
                                                 {canCheckinGeral && insc.status === 'CONFIRMADA' && !insc.checkIn && (
-                                                    <Button size="sm" onClick={() => handleCheckIn(insc.id)} className="h-8 text-[11px]">
+                                                    <Button size="sm" disabled={processingCheckin} onClick={() => handleCheckIn(insc.id)} className="h-8 text-[11px]">
                                                         Check-in Geral
                                                     </Button>
                                                 )}
+                                                {canRemoveCheckinGeral && insc.checkIn && <Button size="sm" variant="outline" disabled={processingCheckin} onClick={() => handleRemoverCheckIn(insc.id)} className="h-8 text-[11px] text-red-700">Remover check-in geral</Button>}
                                             </td>
                                         </tr>
                                     ))
