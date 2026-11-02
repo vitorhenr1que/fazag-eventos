@@ -4,6 +4,7 @@ export const adminActions = {
     APROVAR_INSCRICAO: 'Aprovar inscrições pendentes',
     CHECKIN_SUBEVENTO: 'Fazer check-in em subeventos',
     REMOVER_CHECKIN_SUBEVENTO: 'Remover check-in em subeventos',
+    REMOVER_INSCRICAO_SUBEVENTO: 'Remover inscrições de subeventos',
     LIBERAR_CERTIFICADO: 'Liberar certificado',
     EXCLUIR_CERTIFICADO: 'Excluir certificado',
     CHECKIN_GERAL: 'Fazer check-in geral',

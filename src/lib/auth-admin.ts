@@ -66,6 +66,7 @@ async function authorizeAdminRequest(request: Request, session: AdminSession) {
         } else if (operation === 'certificado') action = request.method === 'DELETE' ? 'EXCLUIR_CERTIFICADO' : 'LIBERAR_CERTIFICADO'
         else if (operation === 'excluir' && request.method === 'POST') action = 'EXCLUIR_INSCRICAO'
         else if (operation === 'aprovar' && request.method === 'POST') action = 'APROVAR_INSCRICAO'
+        else if (/^\/api\/admin\/subeventos\/[^/]+\/inscricoes$/.test(path) && request.method === 'DELETE') action = 'REMOVER_INSCRICAO_SUBEVENTO'
         if (!action || !canAdminAction(session, action)) fail()
     }
     if (path.startsWith('/api/admin/usuarios')) {

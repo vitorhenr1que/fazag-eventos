@@ -1,5 +1,5 @@
 'use client'
-import { canEditAdmin } from '@/lib/admin-permissions'
+import { canEditAdmin, canAdminAction } from '@/lib/admin-permissions'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import { useCallback, useEffect, useState } from 'react'
@@ -31,7 +31,9 @@ const normalizar = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u
 const corresponde = (aluno: Aluno, busca: string) => normalizar(`${aluno.nome} ${aluno.id} ${aluno.email || ''}`).includes(normalizar(busca))
 
 export default function InscritosSubeventoPage() {
-    const readOnly = !canEditAdmin(useAdminSession())
+    const session = useAdminSession()
+    const readOnly = !canEditAdmin(session)
+    const canRemove = canAdminAction(session, 'REMOVER_INSCRICAO_SUBEVENTO')
     const { id: eventoId, subeventoId } = useParams<{ id: string; subeventoId: string }>()
     const [dados, setDados] = useState<Dados | null>(null)
     const [loading, setLoading] = useState(true)
@@ -63,7 +65,7 @@ export default function InscritosSubeventoPage() {
     }, [carregar])
 
     async function alterar(inscricaoId: string, nome: string, metodo: 'POST' | 'DELETE') {
-        if (processando) return
+        if (processando || (metodo === 'DELETE' ? !canRemove : readOnly)) return
         if (metodo === 'DELETE' && !window.confirm(`Remover ${nome} deste subevento? A presença neste subevento também será removida. A inscrição no evento principal e certificados já emitidos serão mantidos.`)) return
         setProcessando(inscricaoId)
         try {
@@ -100,7 +102,7 @@ export default function InscritosSubeventoPage() {
 
         {erro && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             {erro}
-            <Button variant="link" disabled={readOnly || Boolean(processando)} onClick={() => carregar().catch(error => setErro(error instanceof Error ? error.message : 'Erro de conexão'))}>Tentar novamente</Button>
+            <Button variant="link" disabled={Boolean(processando)} onClick={() => carregar().catch(error => setErro(error instanceof Error ? error.message : 'Erro de conexão'))}>Tentar novamente</Button>
         </div>}
         {loading && <p role="status" className="flex items-center justify-center gap-2 p-12 text-slate-500"><Loader2 className="animate-spin" size={20} /> Carregando inscritos...</p>}
 
@@ -153,7 +155,7 @@ export default function InscritosSubeventoPage() {
                                     <td className="p-3"><p className="font-semibold">{item.inscricao.aluno.nome}</p><p className="text-xs text-slate-500">{item.inscricao.aluno.id}</p>{item.inscricao.aluno.email && <p className="text-xs text-slate-500 break-all">{item.inscricao.aluno.email}</p>}</td>
                                     <td className="p-3"><p className="whitespace-nowrap">{formatDate(item.dataInscricao, 'dd/MM/yyyy HH:mm')}</p>{item.inscricao.status !== 'CONFIRMADA' && <p className="text-xs text-amber-800">Evento: {item.inscricao.status}</p>}</td>
                                     <td className="p-3"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${item.checkIn ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{item.checkIn ? 'Confirmada' : 'Não registrada'}</span></td>
-                                    <td className="p-3 text-right"><Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" disabled={readOnly || Boolean(processando) || Boolean(erro)} aria-label={`Remover ${item.inscricao.aluno.nome} deste subevento`} onClick={() => alterar(item.inscricaoId, item.inscricao.aluno.nome, 'DELETE')}>
+                                    <td className="p-3 text-right"><Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" disabled={!canRemove || Boolean(processando) || Boolean(erro)} aria-label={`Remover ${item.inscricao.aluno.nome} deste subevento`} onClick={() => alterar(item.inscricaoId, item.inscricao.aluno.nome, 'DELETE')}>
                                         {processando === item.inscricaoId ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Trash2 size={14} className="mr-2" />} Remover
                                     </Button></td>
                                 </tr>)}

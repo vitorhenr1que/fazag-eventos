@@ -192,6 +192,7 @@ test('aprovação personalizada funciona sem edição geral e respeita área, es
 })
 
 const operations = [
+    { action: 'REMOVER_INSCRICAO_SUBEVENTO', method: 'DELETE', path: '/api/admin/subeventos/sub-1/inscricoes', body: { inscricaoId: 'reg-1' } },
     { action: 'REMOVER_CHECKIN_SUBEVENTO', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'SUBEVENTO', subeventoId: 'sub-1' } },
     { action: 'REMOVER_CHECKIN_GERAL', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
     { action: 'EXCLUIR_CERTIFICADO', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/certificado' },
@@ -200,6 +201,21 @@ const operations = [
     { action: 'CHECKIN_GERAL', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
     { action: 'EXCLUIR_INSCRICAO', path: '/api/admin/inscricoes/reg-1/excluir', permission: 'EXCLUIR_INSCRICAO', body: { modalidade: 'EXCLUIR_TUDO' } },
 ]
+
+test('remover inscrição de subevento não permite incluir alunos, excluir subeventos ou inscrições principais', async () => {
+    const { call, admin } = environment({ permissoes: customConfig(['REMOVER_INSCRICAO_SUBEVENTO']) })
+    const endpoint = '/api/admin/subeventos/sub-1/inscricoes'
+    await call(endpoint, 'GET')
+    await call(endpoint, 'DELETE', undefined, { inscricaoId: 'reg-1' })
+    await assert.rejects(call(endpoint, 'POST', undefined, { inscricaoId: 'reg-1' }), forbidden)
+    await assert.rejects(call('/api/admin/subeventos/sub-1', 'DELETE'), forbidden)
+    await assert.rejects(call('/api/admin/inscricoes/reg-1/excluir', 'POST', 'EXCLUIR_INSCRICAO', { modalidade: 'EXCLUIR_TUDO' }), forbidden)
+    admin.permissoes.acoes = ['REMOVER_CHECKIN_SUBEVENTO']
+    assert.equal(permissions.canAdminAction(admin, 'REMOVER_INSCRICAO_SUBEVENTO'), false)
+    await assert.rejects(call(endpoint, 'DELETE', undefined, { inscricaoId: 'reg-1' }), forbidden)
+    const { userPermissionsSchema } = require('../src/lib/admin-user-schema.ts')
+    assert.equal(userPermissionsSchema.safeParse(customConfig(Object.keys(permissions.adminActions))).success, true)
+})
 
 test('modo Personalizar concede cada ação de forma independente, na interface e no servidor', async () => {
     for (const selected of operations) {
@@ -217,7 +233,7 @@ test('modo Personalizar concede cada ação de forma independente, na interface 
 test('ações personalizadas respeitam área, evento e revogação em sessão aberta', async () => {
     const { call, admin } = environment({ permissoes: customConfig(Object.keys(permissions.adminActions)) })
     for (const operation of operations) {
-        await assert.rejects(call(operation.path.replace('reg-1', 'reg-2'), operation.method || 'POST', operation.permission, operation.body), forbidden)
+        await assert.rejects(call(operation.path.replace('reg-1', 'reg-2').replace('sub-1', 'sub-2'), operation.method || 'POST', operation.permission, operation.body), forbidden)
     }
     admin.permissoes.areas = []
     for (const operation of operations) {

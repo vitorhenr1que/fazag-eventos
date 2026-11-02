@@ -5,7 +5,7 @@ export const userPermissionsSchema = z.object({
     eventos: z.enum(['TODOS', 'PUBLICADOS', 'ESPECIFICOS']),
     eventoIds: z.array(z.string().min(1).max(25)).max(500),
     acesso: z.enum(['VISUALIZAR', 'EDITAR', 'PERSONALIZAR']),
-    acoes: z.array(z.enum(['APROVAR_INSCRICAO', 'CHECKIN_SUBEVENTO', 'REMOVER_CHECKIN_SUBEVENTO', 'LIBERAR_CERTIFICADO', 'EXCLUIR_CERTIFICADO', 'CHECKIN_GERAL', 'REMOVER_CHECKIN_GERAL', 'EXCLUIR_INSCRICAO'])).max(8).optional(),
+    acoes: z.array(z.enum(['APROVAR_INSCRICAO', 'CHECKIN_SUBEVENTO', 'REMOVER_CHECKIN_SUBEVENTO', 'REMOVER_INSCRICAO_SUBEVENTO', 'LIBERAR_CERTIFICADO', 'EXCLUIR_CERTIFICADO', 'CHECKIN_GERAL', 'REMOVER_CHECKIN_GERAL', 'EXCLUIR_INSCRICAO'])).max(9).optional(),
 }).strict()
 export const adminUserSchema = z.object({
     nome: z.string().trim().min(2).max(120),
