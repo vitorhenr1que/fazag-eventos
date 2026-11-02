@@ -4,6 +4,20 @@ import { EventoService } from '@/services/evento.service'
 import { handleApiError } from '@/lib/app-error'
 import prisma from '@/lib/db'
 import { z } from 'zod'
+import { exclusaoEventoSchema } from '@/lib/exclusao-evento'
+import { ExclusaoEventoService } from '@/services/exclusao-evento.service'
+
+export const maxDuration = 300
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const admin = await getAdminFromHeader(request, 'ADMINISTRADOR')
+        const { id } = await params
+        const body = exclusaoEventoSchema.parse(await request.json())
+        const result = await new ExclusaoEventoService().excluir(id, body.certificados === 'MANTER', admin.id, body.certificadosEsperados)
+        return NextResponse.json({ success: true, data: result })
+    } catch (error) { return handleApiError(error) }
+}
 
 const updateSchema = z.object({
     nome: z.string().min(1).max(160), slug: z.string().min(1).max(120),

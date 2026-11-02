@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { handleApiError } from '@/lib/app-error'
+import { certificadoPreservado } from '@/lib/exclusao-evento'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,8 @@ export async function GET(
             }
         })
 
-        if (!certificado || !certificado.inscricao || certificado.inscricao.status !== 'CONFIRMADA') {
+        const preservado = certificado && !certificado.inscricaoId ? certificadoPreservado(certificado.metadadosEvento) : null
+        if (!certificado || (!preservado && (!certificado.inscricao || certificado.inscricao.status !== 'CONFIRMADA'))) {
             return NextResponse.json(
                 { success: false, error: 'Certificado inválido ou não encontrado' },
                 {
@@ -45,6 +47,9 @@ export async function GET(
         if (eventoConfig) {
             template = eventoConfig.template
             fundoUrl = eventoConfig.fundoUrl
+        } else if (preservado) {
+            template = preservado.template ?? null
+            fundoUrl = preservado.fundoUrl ?? null
         }
 
         // Retorna dados públicos seguros
@@ -52,8 +57,8 @@ export async function GET(
             {
                 success: true,
                 data: {
-                    aluno: certificado.inscricao?.aluno?.nome,
-                    evento: certificado.inscricao?.evento?.nome,
+                    aluno: certificado.inscricao?.aluno?.nome ?? preservado?.nomeAluno,
+                    evento: certificado.inscricao?.evento?.nome ?? preservado?.nomeEvento,
                     cargaHoraria: certificado.cargaHorariaTotal,
                     dataEmissao: certificado.dataEmissao,
                     codigo: certificado.codigoValidacao,

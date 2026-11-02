@@ -28,6 +28,7 @@ function ambiente() {
     const snapshot = value => value ? structuredClone(value) : null
     const relacoes = id => vinculos.filter(v => v.inscricaoId === id).map(v => ({ ...v, subevento: subeventos.find(s => s.id === v.subeventoId) }))
     const db = {
+        exclusaoEvento: { findUnique: async () => null },
         subevento: { findUnique: async ({ where }) => {
             const sub = subeventos.find(s => s.id === where.id)
             return snapshot(sub && { ...sub, evento })

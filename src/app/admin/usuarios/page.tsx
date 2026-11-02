@@ -108,7 +108,7 @@ export default function UsuariosPage() {
                                 <div className="grid gap-3 sm:grid-cols-2">{Object.entries(adminActions).map(([key, label]) => <label key={key} className="flex items-start gap-3 rounded-lg border bg-white p-3 text-sm">
                                     <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={config.acoes?.includes(key as AdminAction) ?? false} onChange={e => setPermissions({ acoes: e.target.checked ? [...(config.acoes || []), key as AdminAction] : (config.acoes || []).filter(action => action !== key) })} />{label}
                                 </label>)}</div>
-                                <p className="mt-3 text-xs text-slate-500">As ações respeitam a área Eventos e os eventos liberados para este usuário. Ações desmarcadas ficam bloqueadas.</p>
+                                <p className="mt-3 text-xs text-slate-500">Aprovar inscrições exige a área Inscrições pendentes ou Financeiro. As demais ações exigem a área Eventos. Todas respeitam os eventos liberados para este usuário. Ações desmarcadas ficam bloqueadas.</p>
                             </fieldset>}
                             <p className="mt-2 text-xs text-slate-500">Criar eventos exige acesso a todos os eventos e permissão de edição.</p>
                         </fieldset>

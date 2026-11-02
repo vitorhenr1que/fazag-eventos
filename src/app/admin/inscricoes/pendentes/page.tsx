@@ -1,5 +1,5 @@
 'use client'
-import { canEditAdmin, canAccessAdminPage } from '@/lib/admin-permissions'
+import { canAdminAction, canAccessAdminPage } from '@/lib/admin-permissions'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import { useEffect, useRef, useState } from 'react'
@@ -22,7 +22,7 @@ const normalizarNome = (valor: string) => valor.normalize('NFD').replace(/[\u030
 
 export default function InscricoesPendentesPage() {
     const session = useAdminSession()
-    const readOnly = !canEditAdmin(session)
+    const readOnly = !canAdminAction(session, 'APROVAR_INSCRICAO')
     const [eventos, setEventos] = useState<{ id: string; nome: string }[]>([])
     const [eventoId, setEventoId] = useState('')
     const [initialized, setInitialized] = useState(false)
@@ -87,7 +87,7 @@ export default function InscricoesPendentesPage() {
     const referencia = modalidade !== 'ISENTO' && reservaUtilizavel ? reserva!.valor : ajusteExplicito ? alvo!.valorReferencia : alvo?.evento.preco ?? null
 
     async function aprovar() {
-        if (!alvo || processing) return
+        if (!alvo || readOnly || processing) return
         if (modalidade === 'PAGO' && referencia === null) {
             toast.error('Defina o preço do evento antes de aprovar'); return
         }
@@ -123,6 +123,7 @@ export default function InscricoesPendentesPage() {
 
     return <div className="space-y-6">
         <h1 className="text-3xl font-bold">Aprovações Pendentes</h1>
+        {readOnly && <p role="status" className="text-sm text-amber-800">Seu acesso permite apenas consultar as inscrições. Para aprovar, um administrador deve liberar “Visualizar e editar” ou a ação “Aprovar inscrições pendentes” no modo Personalizar.</p>}
         <p className="text-sm text-slate-600">Confira o comprovante recebido pelo WhatsApp do financeiro: +55 75 98218-1138. A aprovação usa o valor da reserva selecionada, inclusive vencida, ou o preço atual quando não houver reserva. O Pix estático copiado continua utilizável no banco após o vencimento.</p>
         {canAccessAdminPage(session, '/admin/financeiro') && <Link href={eventoId ? `/admin/financeiro?eventoId=${encodeURIComponent(eventoId)}` : '/admin/financeiro'} className="text-blue-700 underline">Ver relatório financeiro</Link>}
         <div className="max-w-xl space-y-2">

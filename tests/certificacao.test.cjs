@@ -9,7 +9,7 @@ const { avaliarCertificacao } = require('../src/lib/certificacao.ts')
 
 function inscricao() {
     return {
-        id: 'inscricao-1', alunoId: 'aluno-1', status: 'CONFIRMADA', checkIn: { id: 'presenca' }, certificado: null,
+        id: 'inscricao-1', eventoId: 'event-1', alunoId: 'aluno-1', status: 'CONFIRMADA', checkIn: { id: 'presenca' }, certificado: null,
         aluno: { nome: 'Aluno' }, subeventosEscolhidos: [],
         evento: { nome: 'Evento', status: 'FINISHED', temSubeventos: true, cargaHorariaBase: 2,
             dataInicio: '2026-10-01T10:00:00Z', dataFim: '2099-10-01T10:00:00Z',
@@ -19,9 +19,12 @@ function inscricao() {
 function environment(record = inscricao()) {
     const created = []
     const db = {
+        $transaction: async callback => callback(db),
+        $queryRaw: async () => [{ adquirido: 1 }],
+        exclusaoEvento: { findUnique: async () => null },
         aluno: { findUnique: async ({ where }) => ({ id: where.id }) },
         inscricao: { findUnique: async () => record, findMany: async () => [record] },
-        certificado: { create: async ({ data }) => { created.push(data); return record.certificado = { id: 'cert-1', ...data } } },
+        certificado: { findMany: async () => [], create: async ({ data }) => { created.push(data); return record.certificado = { id: 'cert-1', ...data } } },
     }
     const cache = new Map()
     function load(file) {

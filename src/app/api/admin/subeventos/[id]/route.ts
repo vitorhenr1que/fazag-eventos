@@ -1,7 +1,8 @@
 import { getAdminFromHeader } from '@/lib/auth-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
-import { handleApiError } from '@/lib/app-error'
+import { AppError, handleApiError } from '@/lib/app-error'
+import { comLockFinanceiro } from '@/lib/financeiro-lock'
 import { EventoService } from '@/services/evento.service'
 import { z } from 'zod'
 
@@ -37,9 +38,9 @@ export async function DELETE(
     try {
         await getAdminFromHeader(request)
         const { id } = await params
-        await prisma.subevento.delete({
-            where: { id }
-        })
+        const subevento = await prisma.subevento.findUnique({ where: { id }, select: { eventoId: true } })
+        if (!subevento) throw new AppError('Subevento não encontrado', 404)
+        await comLockFinanceiro(subevento.eventoId, tx => tx.subevento.delete({ where: { id } }))
         return NextResponse.json({ success: true })
     } catch (error) {
         return handleApiError(error)

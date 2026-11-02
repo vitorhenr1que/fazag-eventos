@@ -9,6 +9,8 @@ require('ts-node').register({ transpileOnly: true, compilerOptions: { module: 'C
 function ambiente() {
     let evento
     const db = {
+        $queryRaw: async () => [{ adquirido: 1 }],
+        exclusaoEvento: { findUnique: async () => null },
         evento: {
             create: async ({ data }) => (evento = { id: 'evento-1', ...data }),
             update: async ({ data }) => (evento = { ...evento, ...data }),

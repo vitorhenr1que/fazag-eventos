@@ -3,6 +3,7 @@ import { EventoRepository, SubeventoRepository } from '@/repositories/evento.rep
 
 import { AppError } from '@/lib/app-error'
 import { chavePixSchema } from '@/lib/evento-pagamento'
+import { comLockFinanceiro } from '@/lib/financeiro-lock'
 
 const eventRepo = new EventoRepository()
 const subEventRepo = new SubeventoRepository()
@@ -41,23 +42,25 @@ export class EventoService {
         if (data.tipo === 'GRATUITO') {
             eventData.chavePix = null
         }
-        return eventRepo.update(id, eventData)
+        return comLockFinanceiro(id, () => eventRepo.update(id, eventData))
     }
 
     async adicionarSubevento(eventoId: string, data: any) {
         if (new Date(data.dataInicio) >= new Date(data.dataFim)) {
             throw new AppError('A data de início deve ser anterior à data de término', 400)
         }
-        return subEventRepo.create({
+        return comLockFinanceiro(eventoId, () => subEventRepo.create({
             ...data,
             evento: { connect: { id: eventoId } }
-        })
+        }))
     }
 
     async atualizarSubevento(id: string, data: any) {
         if (data.dataInicio && data.dataFim && new Date(data.dataInicio) >= new Date(data.dataFim)) {
             throw new AppError('A data de início deve ser anterior à data de término', 400)
         }
-        return subEventRepo.update(id, data)
+        const subevento = await prisma.subevento.findUnique({ where: { id }, select: { eventoId: true } })
+        if (!subevento) throw new AppError('Subevento não encontrado', 404)
+        return comLockFinanceiro(subevento.eventoId, () => subEventRepo.update(id, data))
     }
 }

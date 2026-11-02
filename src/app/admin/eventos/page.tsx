@@ -4,19 +4,21 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { apiFetch } from '@/lib/api-client'
-import { Plus, Edit2, Users, MoreVertical, Eye, Layers } from 'lucide-react'
+import { Plus, Edit2, Users, MoreVertical, Eye, Layers, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
-import { canEditAdmin, canCreateEvento, canAccessAdminPage } from '@/lib/admin-permissions'
+import { canEditAdmin, canCreateEvento, canAccessAdminPage, hasAdminPermission } from '@/lib/admin-permissions'
+import { ExcluirEventoDialog } from '@/components/admin/ExcluirEventoDialog'
 import { Paginacao, ITENS_POR_PAGINA } from '@/components/admin/Paginacao'
 
 export default function AdminEventosPage() {
     const session = useAdminSession()
     const [eventos, setEventos] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [excluirEvento, setExcluirEvento] = useState<{ id: string; nome: string } | null>(null)
     const [pagina, setPagina] = useState(1)
     const paginaAtual = Math.min(pagina, Math.max(1, Math.ceil(eventos.length / ITENS_POR_PAGINA)))
     const eventosPaginados = eventos.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
@@ -126,6 +128,7 @@ export default function AdminEventosPage() {
                                                 {canEditAdmin(session) ? <Edit2 size={16} /> : <Eye size={16} />}
                                             </Link>
                                         </Button>
+                                        {hasAdminPermission(session, 'ADMINISTRADOR') && <Button variant="ghost" size="sm" aria-label={`Excluir evento ${e.nome}`} title="Excluir evento" className="text-red-700" onClick={() => setExcluirEvento({ id: e.id, nome: e.nome })}><Trash2 size={16} /></Button>}
                                     </td>
                                 </tr>
                             ))
@@ -139,6 +142,7 @@ export default function AdminEventosPage() {
                 )}
                 {!loading && <Paginacao pagina={paginaAtual} total={eventos.length} onPaginaChange={setPagina} />}
             </div>
+            {excluirEvento && <ExcluirEventoDialog evento={excluirEvento} fechar={() => setExcluirEvento(null)} excluido={() => { setEventos(current => current.filter(e => e.id !== excluirEvento.id)); setExcluirEvento(null) }} />}
         </div>
     )
 }

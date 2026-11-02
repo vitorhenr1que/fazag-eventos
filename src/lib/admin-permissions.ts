@@ -1,6 +1,7 @@
 export type AdminRole = 'ADMIN' | 'SUPER_ADMIN' | 'NUPPEX' | 'FINANCEIRO'
 export type AdminPermission = 'GESTAO' | 'FINANCEIRO' | 'SESSAO' | 'ADMINISTRADOR' | 'EXCLUIR_INSCRICAO'
 export const adminActions = {
+    APROVAR_INSCRICAO: 'Aprovar inscrições pendentes',
     CHECKIN_SUBEVENTO: 'Fazer check-in em subeventos',
     REMOVER_CHECKIN_SUBEVENTO: 'Remover check-in em subeventos',
     LIBERAR_CERTIFICADO: 'Liberar certificado',
@@ -30,7 +31,11 @@ export function canEditAdmin(subject: Subject) {
     return isAdminRole(roleOf(subject)) && (!permissionsOf(subject) || permissionsOf(subject)?.acesso === 'EDITAR')
 }
 export function canAdminAction(subject: Subject, action: AdminAction): boolean {
-    if (!isAdminRole(roleOf(subject)) || !canAccessAdminPage(subject, '/admin/eventos')) return false
+    if (!isAdminRole(roleOf(subject))) return false
+    const areaAllowed = action === 'APROVAR_INSCRICAO'
+        ? hasAdminPermission(subject, 'FINANCEIRO')
+        : canAccessAdminPage(subject, '/admin/eventos')
+    if (!areaAllowed) return false
     const config = permissionsOf(subject)
     if (config?.acesso === 'PERSONALIZAR') return config.acoes?.includes(action) ?? false
     if (action === 'EXCLUIR_INSCRICAO') return hasAdminPermission(subject, 'ADMINISTRADOR')

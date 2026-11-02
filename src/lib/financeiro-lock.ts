@@ -11,7 +11,7 @@ import { AppError } from './app-error'
 // A exclusão mútua entre processos continua sendo garantida pelo GET_LOCK no MySQL.
 const filas = new Map<string, Promise<void>>()
 
-export async function comLockFinanceiro<T>(eventoId: string, operacao: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+export async function comLockFinanceiro<T>(eventoId: string, operacao: (tx: Prisma.TransactionClient) => Promise<T>, permitirExclusaoEvento = false, timeout = 35000): Promise<T> {
     const anterior = filas.get(eventoId) ?? Promise.resolve()
     let liberarFila!: () => void
     const atual = new Promise<void>(resolve => { liberarFila = resolve })
@@ -23,9 +23,12 @@ export async function comLockFinanceiro<T>(eventoId: string, operacao: (tx: Pris
             const locks = await conexaoLock.$queryRaw<{ adquirido: number | bigint | null }[]>`SELECT GET_LOCK(${lockName}, 10) AS adquirido`
             if (Number(locks[0]?.adquirido) !== 1) throw new AppError('Outra operação financeira está em andamento. Tente novamente.', 409)
             try {
+                if (!permitirExclusaoEvento && await prisma.exclusaoEvento.findUnique({ where: { eventoId }, select: { eventoId: true } })) {
+                    throw new AppError('Este evento está sendo excluído. Não é possível alterar seus registros.', 409, 'EVENTO_EM_EXCLUSAO')
+                }
                 return await operacao(prisma)
             } finally { await conexaoLock.$queryRaw`SELECT RELEASE_LOCK(${lockName})` }
-        }, { timeout: 35000 })
+        }, { timeout })
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2028', 'P2024'].includes(error.code)) {
             throw new AppError('Operação financeira indisponível no momento. Tente novamente.', 409, 'FINANCEIRO_OCUPADO')

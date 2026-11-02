@@ -3,6 +3,7 @@ const path = require('node:path')
 const Module = require('node:module')
 const ts = require('typescript')
 module.exports = function loadLock(db) {
+    db.exclusaoEvento ||= { findUnique: async () => null }
     const file = path.resolve(__dirname, '../../src/lib/financeiro-lock.ts')
     const loaded = new Module(file, module); loaded.filename = file; loaded.paths = module.paths
     const original = loaded.require.bind(loaded)

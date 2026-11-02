@@ -56,7 +56,7 @@ async function authorizeAdminRequest(request: Request, session: AdminSession) {
     if (write && !canEditAdmin(session)) {
         if (session.permissoes?.acesso !== 'PERSONALIZAR' || !['POST', 'DELETE'].includes(request.method)) fail()
         let action: AdminAction | undefined
-        const operation = path.match(/^\/api\/admin\/inscricoes\/[^/]+\/(checkin|certificado|excluir)$/)?.[1]
+        const operation = path.match(/^\/api\/admin\/inscricoes\/[^/]+\/(checkin|certificado|excluir|aprovar)$/)?.[1]
         if (operation === 'checkin') {
             const body = adminCheckinSchema.parse(await request.clone().json())
             action = request.method === 'DELETE'
@@ -65,6 +65,7 @@ async function authorizeAdminRequest(request: Request, session: AdminSession) {
             if (body.tipo === 'SUBEVENTO') checkinSubId = body.subeventoId
         } else if (operation === 'certificado') action = request.method === 'DELETE' ? 'EXCLUIR_CERTIFICADO' : 'LIBERAR_CERTIFICADO'
         else if (operation === 'excluir' && request.method === 'POST') action = 'EXCLUIR_INSCRICAO'
+        else if (operation === 'aprovar' && request.method === 'POST') action = 'APROVAR_INSCRICAO'
         if (!action || !canAdminAction(session, action)) fail()
     }
     if (path.startsWith('/api/admin/usuarios')) {
@@ -107,6 +108,10 @@ async function authorizeAdminRequest(request: Request, session: AdminSession) {
         if (!eventoId && !canCreateEvento(session)) fail()
         if (path.endsWith('/object') && !eventoId) fail()
     }
-    if (eventoId) await assertAdminEvento(session, decodeURIComponent(eventoId))
+    if (eventoId) {
+        const exclusao = /^\/api\/admin\/eventos\/[^/]+(?:\/exclusao)?$/.test(path) && (request.method === 'DELETE' || path.endsWith('/exclusao')) && hasAdminPermission(session, 'ADMINISTRADOR')
+            ? await prisma.exclusaoEvento.findUnique({ where: { eventoId }, select: { eventoId: true } }) : null
+        if (!exclusao) await assertAdminEvento(session, decodeURIComponent(eventoId))
+    }
     if (path === '/api/admin/eventos' && write && !canCreateEvento(session)) fail()
 }

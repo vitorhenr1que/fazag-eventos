@@ -16,6 +16,7 @@ function ambiente() {
     let busy = false
     const waiting = []
     const db = {
+        exclusaoEvento: { findUnique: async () => null },
         inscricao: {
             findUnique: async () => state.inscricao ? { ...state.inscricao, evento: { ...state.inscricao.evento } } : null,
             count: async () => state.count,

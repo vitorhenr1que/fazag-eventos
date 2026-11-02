@@ -289,3 +289,16 @@ model PagamentoCancelado {
   @@index([eventoId])
   @@map("pagamentos_cancelados")
 }
+
+// Registro independente para retomar uma exclusão interrompida, inclusive em MyISAM.
+model ExclusaoEvento {
+  eventoId String @id @db.VarChar(25)
+  nomeEvento String @db.VarChar(160)
+  manterCertificados Boolean
+  estado String @default("PROCESSANDO") @db.VarChar(20)
+  excluidoPor String @db.VarChar(25)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exclusoes_eventos")
+}

@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 export default function MinhasInscricoesPage() {
     const [inscricoes, setInscricoes] = useState<any[]>([])
+    const [preservados, setPreservados] = useState<{ id: string; nomeEvento: string; cargaHorariaTotal: number | null; codigoValidacao: string }[]>([])
     const [loading, setLoading] = useState(true)
     const [generatingId, setGeneratingId] = useState<string | null>(null)
 
@@ -22,6 +23,7 @@ export default function MinhasInscricoesPage() {
             const json = await res.json()
             if (!res.ok) throw new Error(json.error?.message || 'Não foi possível carregar suas inscrições')
             setInscricoes(json.data)
+            setPreservados(json.certificadosPreservados || [])
         } catch (error) { toast.error(error instanceof Error ? error.message : 'Erro de conexão') }
         finally { setLoading(false) }
     }
@@ -59,14 +61,14 @@ export default function MinhasInscricoesPage() {
         }
     }
 
-    const totalHoras = inscricoes.reduce((acc, insc) => acc + (insc.certificado?.cargaHorariaTotal || 0), 0);
-    const totalCertificados = inscricoes.filter(insc => !!insc.certificado).length;
+    const totalHoras = inscricoes.reduce((acc, insc) => acc + (insc.certificado?.cargaHorariaTotal || 0), 0) + preservados.reduce((total, certificado) => total + (certificado.cargaHorariaTotal || 0), 0);
+    const totalCertificados = inscricoes.filter(insc => !!insc.certificado).length + preservados.length;
 
     return (
         <div className="container py-8 max-w-4xl mx-auto px-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <h1 className="text-3xl font-bold">Minhas Inscrições</h1>
-                {!loading && inscricoes.length > 0 && (
+                {!loading && (inscricoes.length > 0 || preservados.length > 0) && (
                     <div className="flex gap-3 w-full md:w-auto">
                         <div className="flex-1 md:flex-none bg-white p-3 px-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3">
                             <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
@@ -219,6 +221,7 @@ export default function MinhasInscricoesPage() {
                     })}
                 </div>
             )}
+            {!loading && preservados.length > 0 && <section className="mt-8 space-y-4" aria-label="Certificados preservados"><h2 className="text-xl font-bold">Certificados preservados</h2><p className="text-sm text-slate-500">Seus certificados continuam disponíveis mesmo após a exclusão dos eventos.</p>{preservados.map(certificado => <Card key={certificado.id}><CardContent className="flex flex-wrap items-center justify-between gap-4 p-6"><div><h3 className="font-semibold">{certificado.nomeEvento}</h3><p className="text-sm text-slate-500">{certificado.cargaHorariaTotal}h · Evento excluído</p></div><Button asChild><Link href={`/certificados/${certificado.codigoValidacao}`}><Award size={16} className="mr-2" />Ver certificado</Link></Button></CardContent></Card>)}</section>}
         </div>
     )
 }

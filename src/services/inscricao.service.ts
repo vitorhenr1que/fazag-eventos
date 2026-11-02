@@ -10,8 +10,18 @@ const inscricaoRepo = new InscricaoRepository()
 const eventoRepo = new EventoRepository()
 
 export class InscricaoService {
+    private async comLockInscricao<T>(inscricaoId: string, operation: () => Promise<T>): Promise<T> {
+        const inscricao = await prisma.inscricao.findUnique({ where: { id: inscricaoId }, select: { eventoId: true } })
+        if (!inscricao) throw new AppError("Inscrição não encontrada", 404)
+        return comLockFinanceiro(inscricao.eventoId, operation)
+    }
+
 
     async realizarInscricao(alunoId: string, eventoId: string) {
+        return comLockFinanceiro(eventoId, () => this.realizarInscricaoInterna(alunoId, eventoId))
+    }
+
+    private async realizarInscricaoInterna(alunoId: string, eventoId: string) {
         // 1. Validar disponibilidade
         const evento = await eventoRepo.findById(eventoId)
         if (!evento) throw new AppError('Evento não encontrado', 404)
@@ -120,6 +130,10 @@ export class InscricaoService {
     }
 
     async checkInAluno(alunoId: string, inscricaoId: string) {
+        return this.comLockInscricao(inscricaoId, () => this.checkInAlunoInterno(alunoId, inscricaoId))
+    }
+
+    private async checkInAlunoInterno(alunoId: string, inscricaoId: string) {
         const inscricao = await inscricaoRepo.findById(inscricaoId) as any
         if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
         if (inscricao.alunoId !== alunoId) throw new AppError('Acesso negado', 403)
@@ -148,6 +162,10 @@ export class InscricaoService {
     }
 
     async checkIn(tipo: 'EVENTO' | 'SUBEVENTO', idRef: string) {
+        return this.comLockInscricao(idRef, () => this.checkInInterno(tipo, idRef))
+    }
+
+    private async checkInInterno(tipo: 'EVENTO' | 'SUBEVENTO', idRef: string) {
         if (tipo === 'EVENTO') {
             const inscricao = await prisma.inscricao.findUnique({ where: { id: idRef }, select: { status: true } })
             if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
@@ -219,6 +237,10 @@ export class InscricaoService {
     }
 
     async emitirCertificado(inscricaoId: string, alunoId: string) {
+        return this.comLockInscricao(inscricaoId, () => this.emitirCertificadoInterno(inscricaoId, alunoId))
+    }
+
+    private async emitirCertificadoInterno(inscricaoId: string, alunoId: string) {
         const inscricao = await inscricaoRepo.findById(inscricaoId) as any
         if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
         if (inscricao.alunoId !== alunoId) throw new AppError('Não autorizado', 403)
@@ -260,6 +282,10 @@ export class InscricaoService {
     }
 
     async adminEmitirCertificado(inscricaoId: string, customCargaHoraria?: number) {
+        return this.comLockInscricao(inscricaoId, () => this.adminEmitirCertificadoInterno(inscricaoId, customCargaHoraria))
+    }
+
+    private async adminEmitirCertificadoInterno(inscricaoId: string, customCargaHoraria?: number) {
         const inscricao = await inscricaoRepo.findById(inscricaoId) as any
         if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
         if (inscricao.status !== 'CONFIRMADA') throw new AppError('A inscrição precisa estar confirmada para emitir certificado')
@@ -311,6 +337,10 @@ export class InscricaoService {
     }
 
     async adminExcluirCertificado(inscricaoId: string) {
+        return this.comLockInscricao(inscricaoId, () => this.adminExcluirCertificadoInterno(inscricaoId))
+    }
+
+    private async adminExcluirCertificadoInterno(inscricaoId: string) {
         const inscricao = await inscricaoRepo.findById(inscricaoId) as any
         if (!inscricao) throw new AppError('Inscrição não encontrada', 404)
 

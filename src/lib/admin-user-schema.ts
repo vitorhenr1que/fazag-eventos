@@ -5,10 +5,8 @@ export const userPermissionsSchema = z.object({
     eventos: z.enum(['TODOS', 'PUBLICADOS', 'ESPECIFICOS']),
     eventoIds: z.array(z.string().min(1).max(25)).max(500),
     acesso: z.enum(['VISUALIZAR', 'EDITAR', 'PERSONALIZAR']),
-    acoes: z.array(z.enum(['CHECKIN_SUBEVENTO', 'REMOVER_CHECKIN_SUBEVENTO', 'LIBERAR_CERTIFICADO', 'EXCLUIR_CERTIFICADO', 'CHECKIN_GERAL', 'REMOVER_CHECKIN_GERAL', 'EXCLUIR_INSCRICAO'])).max(7).optional(),
-}).strict().superRefine((data, ctx) => {
-    if (data.eventos === 'ESPECIFICOS' && !data.eventoIds.length) ctx.addIssue({ code: 'custom', path: ['eventoIds'], message: 'Selecione ao menos um evento.' })
-})
+    acoes: z.array(z.enum(['APROVAR_INSCRICAO', 'CHECKIN_SUBEVENTO', 'REMOVER_CHECKIN_SUBEVENTO', 'LIBERAR_CERTIFICADO', 'EXCLUIR_CERTIFICADO', 'CHECKIN_GERAL', 'REMOVER_CHECKIN_GERAL', 'EXCLUIR_INSCRICAO'])).max(8).optional(),
+}).strict()
 export const adminUserSchema = z.object({
     nome: z.string().trim().min(2).max(120),
     email: z.string().trim().toLowerCase().email().max(190),
@@ -17,5 +15,6 @@ export const adminUserSchema = z.object({
     ativo: z.boolean(),
     permissoes: userPermissionsSchema.nullable(),
 }).strict().superRefine((data, ctx) => {
+    if (data.permissoes?.eventos === 'ESPECIFICOS' && !data.permissoes.eventoIds.length) ctx.addIssue({ code: 'custom', path: ['permissoes', 'eventoIds'], message: 'Selecione ao menos um evento.' })
     if (['ADMIN', 'SUPER_ADMIN'].includes(data.role) && data.permissoes) ctx.addIssue({ code: 'custom', path: ['role'], message: 'Administradores têm acesso completo. Use um perfil personalizado para restringir o acesso.' })
 })

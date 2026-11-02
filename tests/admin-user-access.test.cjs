@@ -12,6 +12,9 @@ function environment(overrides = {}) {
     let admin = { id: 'user-1', nome: 'Operador', email: 'operador@example.com', role: 'NUPPEX', ativo: true,
         permissoes: { areas: ['eventos'], eventos: 'ESPECIFICOS', eventoIds: ['event-1'], acesso: 'VISUALIZAR' }, ...overrides }
     const db = {
+        $transaction: async callback => callback(db),
+        $queryRaw: async () => [{ adquirido: 1 }],
+        exclusaoEvento: { findUnique: async () => null },
         admin: { findUnique: async () => admin },
         evento: { findFirst: async ({ where }) => {
             const [target, filter] = where.AND
@@ -45,6 +48,20 @@ function environment(overrides = {}) {
     return { call, admin, db, load }
 }
 const forbidden = error => error.statusCode === 403
+
+test('excluir eventos é exclusivo de administradores, inclusive com todas as ações personalizadas', async () => {
+    for (const values of [
+        { role: 'NUPPEX', permissoes: null },
+        { role: 'FINANCEIRO', permissoes: null },
+        { role: 'NUPPEX', permissoes: { areas: ['eventos'], eventos: 'TODOS', eventoIds: [], acesso: 'EDITAR' } },
+        { role: 'NUPPEX', permissoes: { areas: ['eventos'], eventos: 'TODOS', eventoIds: [], acesso: 'PERSONALIZAR', acoes: Object.keys(permissions.adminActions) } },
+    ]) {
+        const { call } = environment(values)
+        await assert.rejects(call('/api/admin/eventos/event-1', 'DELETE', 'ADMINISTRADOR'), forbidden)
+        await assert.rejects(call('/api/admin/eventos/event-1/exclusao', 'GET', 'ADMINISTRADOR'), forbidden)
+    }
+    for (const role of ['ADMIN', 'SUPER_ADMIN']) await environment({ role, permissoes: null }).call('/api/admin/eventos/event-1', 'DELETE', 'ADMINISTRADOR')
+})
 
 test('configuração individual separa áreas e bloqueia a gestão de usuários', () => {
     const { admin } = environment()
@@ -150,6 +167,30 @@ test('edição preserva senha omitida e impede desativar ou rebaixar a própria 
 })
 
 const customConfig = (acoes, values = {}) => ({ areas: ['eventos'], eventos: 'ESPECIFICOS', eventoIds: ['event-1'], acesso: 'PERSONALIZAR', acoes, ...values })
+
+test('aprovação personalizada funciona sem edição geral e respeita área, escopo e revogação', async () => {
+    for (const area of ['pendentes', 'financeiro']) {
+        const { call, admin } = environment({ permissoes: customConfig(['APROVAR_INSCRICAO'], { areas: [area] }) })
+        assert.equal(permissions.canEditAdmin(admin), false)
+        assert.equal(permissions.canAdminAction(admin, 'APROVAR_INSCRICAO'), true)
+        await call('/api/admin/inscricoes/reg-1/aprovar', 'POST', 'FINANCEIRO')
+        await assert.rejects(call('/api/admin/inscricoes/reg-2/aprovar', 'POST', 'FINANCEIRO'), forbidden)
+        await assert.rejects(call('/api/admin/inscricoes/reg-1/aprovar', 'DELETE', 'FINANCEIRO'), forbidden)
+        await assert.rejects(call('/api/admin/inscricoes/reg-1/financeiro', 'POST', 'FINANCEIRO'), forbidden)
+        admin.permissoes.acoes = []
+        assert.equal(permissions.canAdminAction(admin, 'APROVAR_INSCRICAO'), false)
+        await assert.rejects(call('/api/admin/inscricoes/reg-1/aprovar', 'POST', 'FINANCEIRO'), forbidden)
+        admin.permissoes.acoes = ['APROVAR_INSCRICAO']
+        admin.permissoes.acesso = 'VISUALIZAR'
+        assert.equal(permissions.canAdminAction(admin, 'APROVAR_INSCRICAO'), false)
+        await assert.rejects(call('/api/admin/inscricoes/reg-1/aprovar', 'POST', 'FINANCEIRO'), forbidden)
+        admin.permissoes.acesso = 'PERSONALIZAR'
+        admin.permissoes.areas = ['eventos']
+        assert.equal(permissions.canAdminAction(admin, 'APROVAR_INSCRICAO'), false)
+        await assert.rejects(call('/api/admin/inscricoes/reg-1/aprovar', 'POST', 'FINANCEIRO'), forbidden)
+    }
+})
+
 const operations = [
     { action: 'REMOVER_CHECKIN_SUBEVENTO', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'SUBEVENTO', subeventoId: 'sub-1' } },
     { action: 'REMOVER_CHECKIN_GERAL', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
