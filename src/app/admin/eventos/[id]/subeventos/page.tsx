@@ -1,5 +1,5 @@
 'use client'
-import { canEditAdmin } from '@/lib/admin-permissions'
+import { canEditAdmin, canAdminAction } from '@/lib/admin-permissions'
 import { useAdminSession } from '@/components/admin/AdminSessionContext'
 
 import React, { useCallback, useEffect, useState } from 'react'
@@ -13,7 +13,9 @@ import Link from 'next/link'
 import { formatDate, formatForInput } from '@/lib/utils'
 
 export default function GerenciarSubeventosPage() {
-    const readOnly = !canEditAdmin(useAdminSession())
+    const session = useAdminSession()
+    const readOnly = !canEditAdmin(session)
+    const canEditSubevento = canAdminAction(session, 'EDITAR_SUBEVENTO')
     const params = useParams()
     const [evento, setEvento] = useState<any>(null)
     const [subeventos, setSubeventos] = useState<any[]>([])
@@ -257,7 +259,7 @@ export default function GerenciarSubeventosPage() {
                                         <Users size={14} className="mr-2" /> Inscritos
                                     </Link>
                                 </Button>
-                                <Button disabled={readOnly} variant="outline" size="sm" aria-label={`Editar ${sub.nome}`} onClick={() => startEdit(sub)}>
+                                <Button disabled={!canEditSubevento} variant="outline" size="sm" aria-label={`Editar ${sub.nome}`} onClick={() => startEdit(sub)}>
                                     <Edit2 size={14} />
                                 </Button>
                                 <Button disabled={readOnly} variant="outline" size="sm" aria-label={`Excluir ${sub.nome}`} className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(sub.id)}>

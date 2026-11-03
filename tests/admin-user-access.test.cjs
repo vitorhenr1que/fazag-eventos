@@ -192,6 +192,7 @@ test('aprovação personalizada funciona sem edição geral e respeita área, es
 })
 
 const operations = [
+    { action: 'EDITAR_SUBEVENTO', method: 'PUT', path: '/api/admin/subeventos/sub-1', body: { nome: 'Atividade atualizada' } },
     { action: 'REMOVER_INSCRICAO_SUBEVENTO', method: 'DELETE', path: '/api/admin/subeventos/sub-1/inscricoes', body: { inscricaoId: 'reg-1' } },
     { action: 'REMOVER_CHECKIN_SUBEVENTO', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'SUBEVENTO', subeventoId: 'sub-1' } },
     { action: 'REMOVER_CHECKIN_GERAL', method: 'DELETE', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
@@ -201,6 +202,21 @@ const operations = [
     { action: 'CHECKIN_GERAL', path: '/api/admin/inscricoes/reg-1/checkin', body: { tipo: 'EVENTO' } },
     { action: 'EXCLUIR_INSCRICAO', path: '/api/admin/inscricoes/reg-1/excluir', permission: 'EXCLUIR_INSCRICAO', body: { modalidade: 'EXCLUIR_TUDO' } },
 ]
+
+test('editar subeventos permite apenas atualizar subeventos dos eventos autorizados', async () => {
+    const { call, admin } = environment({ permissoes: customConfig(['EDITAR_SUBEVENTO']) })
+    await call('/api/admin/subeventos/sub-1', 'PUT', undefined, { nome: 'Atualizado' })
+    for (const [endpoint, method] of [
+        ['/api/admin/subeventos/sub-2', 'PUT'],
+        ['/api/admin/subeventos/sub-1', 'POST'],
+        ['/api/admin/subeventos/sub-1', 'DELETE'],
+        ['/api/admin/eventos/event-1/subeventos', 'POST'],
+        ['/api/admin/eventos/event-1', 'PUT'],
+        ['/api/admin/subeventos/sub-1/inscricoes', 'PUT'],
+    ]) await assert.rejects(call(endpoint, method), forbidden)
+    admin.permissoes.acoes = []
+    await assert.rejects(call('/api/admin/subeventos/sub-1', 'PUT'), forbidden)
+})
 
 test('remover inscrição de subevento não permite incluir alunos, excluir subeventos ou inscrições principais', async () => {
     const { call, admin } = environment({ permissoes: customConfig(['REMOVER_INSCRICAO_SUBEVENTO']) })

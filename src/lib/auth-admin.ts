@@ -54,10 +54,11 @@ async function authorizeAdminRequest(request: Request, session: AdminSession) {
     const fail = () => { throw new AppError('Você não tem permissão para esta ação.', 403, 'FORBIDDEN') }
     let checkinSubId: string | undefined
     if (write && !canEditAdmin(session)) {
-        if (session.permissoes?.acesso !== 'PERSONALIZAR' || !['POST', 'DELETE'].includes(request.method)) fail()
+        if (session.permissoes?.acesso !== 'PERSONALIZAR' || !['POST', 'PUT', 'DELETE'].includes(request.method)) fail()
         let action: AdminAction | undefined
         const operation = path.match(/^\/api\/admin\/inscricoes\/[^/]+\/(checkin|certificado|excluir|aprovar)$/)?.[1]
-        if (operation === 'checkin') {
+        if (/^\/api\/admin\/subeventos\/[^/]+$/.test(path) && request.method === 'PUT') action = 'EDITAR_SUBEVENTO'
+        else if (operation === 'checkin') {
             const body = adminCheckinSchema.parse(await request.clone().json())
             action = request.method === 'DELETE'
                 ? body.tipo === 'SUBEVENTO' ? 'REMOVER_CHECKIN_SUBEVENTO' : 'REMOVER_CHECKIN_GERAL'

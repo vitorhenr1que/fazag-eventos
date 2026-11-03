@@ -1,6 +1,7 @@
 export type AdminRole = 'ADMIN' | 'SUPER_ADMIN' | 'NUPPEX' | 'FINANCEIRO'
 export type AdminPermission = 'GESTAO' | 'FINANCEIRO' | 'SESSAO' | 'ADMINISTRADOR' | 'EXCLUIR_INSCRICAO'
 export const adminActions = {
+    EDITAR_SUBEVENTO: 'Editar subeventos',
     APROVAR_INSCRICAO: 'Aprovar inscrições pendentes',
     CHECKIN_SUBEVENTO: 'Fazer check-in em subeventos',
     REMOVER_CHECKIN_SUBEVENTO: 'Remover check-in em subeventos',
