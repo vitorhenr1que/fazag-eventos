@@ -32,12 +32,9 @@ export default function FinanceiroPage() {
     const [motivo, setMotivo] = useState('')
     const [valorHistorico, setValorHistorico] = useState('')
     const [processando, setProcessando] = useState(false)
-    const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null)
-    const pausarAtualizacao = useRef(false)
     const dialogRef = useRef<HTMLDialogElement>(null)
 
     useEffect(() => { if (acao) dialogRef.current?.showModal(); else dialogRef.current?.close() }, [acao])
-    useEffect(() => { pausarAtualizacao.current = processando || acao !== null }, [processando, acao])
 
     useEffect(() => {
         setEventoId(new URLSearchParams(window.location.search).get('eventoId') || '')
@@ -45,33 +42,21 @@ export default function FinanceiroPage() {
 
     useEffect(() => {
         let ativo = true
-        let carregando = false
         const controller = new AbortController()
-        setLoading(true); setErro(''); setEvento(null); setAtualizadoEm(null)
+        setLoading(true); setErro(''); setEvento(null)
         async function carregar() {
-            if (carregando) return
-            carregando = true
             try {
                 const res = await apiFetch(`/api/admin/financeiro${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ''}`, { isAdmin: true, cache: 'no-store', signal: controller.signal })
                 const json = await res.json()
                 if (!res.ok) throw new Error(json.error?.message || 'Não foi possível carregar o relatório')
-                if (ativo) { setEventos(json.data.eventos); setEvento(json.data.evento); setErro(''); setAtualizadoEm(new Date().toISOString()) }
+                if (ativo) { setEventos(json.data.eventos); setEvento(json.data.evento) }
             } catch (error) { if (ativo) setErro(error instanceof Error ? error.message : 'Erro de conexão') }
-            finally { carregando = false; if (ativo) setLoading(false) }
-        }
-        function atualizarSeVisivel() {
-            if (document.visibilityState === 'visible' && !pausarAtualizacao.current) void carregar()
+            finally { if (ativo) setLoading(false) }
         }
         carregar()
-        const intervalo = window.setInterval(atualizarSeVisivel, 30_000)
-        window.addEventListener('focus', atualizarSeVisivel)
-        document.addEventListener('visibilitychange', atualizarSeVisivel)
         return () => {
             ativo = false
             controller.abort()
-            window.clearInterval(intervalo)
-            window.removeEventListener('focus', atualizarSeVisivel)
-            document.removeEventListener('visibilitychange', atualizarSeVisivel)
         }
     }, [eventoId, revisao])
 
@@ -168,7 +153,6 @@ export default function FinanceiroPage() {
             </div>
             <Button variant="outline" disabled={loading || processando} onClick={() => setRevisao(r => r + 1)}>Atualizar</Button>
         </div>
-        <p className="text-sm text-slate-500" role="status">Atualização automática a cada 30 segundos com a página visível.{atualizadoEm && !erro && ` Última atualização: ${data(atualizadoEm)}.`}</p>
         {loading ? <p role="status" className="flex gap-2 text-slate-600"><Loader2 size={20} className="animate-spin" />Carregando relatório...</p>
         : erro ? <p role="alert" className="rounded border border-red-200 bg-red-50 p-4 text-red-700">{erro}</p>
         : !evento ? <p className="p-8 text-center text-slate-500">Selecione um evento para consultar os inscritos e os recebimentos.</p>
