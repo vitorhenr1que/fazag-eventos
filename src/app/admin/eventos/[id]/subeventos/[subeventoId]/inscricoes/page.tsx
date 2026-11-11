@@ -5,7 +5,7 @@ import { useAdminSession } from '@/components/admin/AdminSessionContext'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Loader2, Plus, Search, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,11 +34,14 @@ export default function InscritosSubeventoPage() {
     const session = useAdminSession()
     const readOnly = !canEditAdmin(session)
     const canRemove = canAdminAction(session, 'REMOVER_INSCRICAO_SUBEVENTO')
+    const canCheckin = canAdminAction(session, 'CHECKIN_SUBEVENTO')
     const { id: eventoId, subeventoId } = useParams<{ id: string; subeventoId: string }>()
     const [dados, setDados] = useState<Dados | null>(null)
     const [loading, setLoading] = useState(true)
     const [erro, setErro] = useState('')
     const [processando, setProcessando] = useState<string | null>(null)
+    const [confirmandoPresenca, setConfirmandoPresenca] = useState<string | null>(null)
+    const ocupado = Boolean(processando || confirmandoPresenca)
     const [buscaInscritos, setBuscaInscritos] = useState('')
     const [buscaAdicionar, setBuscaAdicionar] = useState('')
     const [mostrarAdicionar, setMostrarAdicionar] = useState(false)
@@ -65,7 +68,7 @@ export default function InscritosSubeventoPage() {
     }, [carregar])
 
     async function alterar(inscricaoId: string, nome: string, metodo: 'POST' | 'DELETE') {
-        if (processando || (metodo === 'DELETE' ? !canRemove : readOnly)) return
+        if (ocupado || (metodo === 'DELETE' ? !canRemove : readOnly)) return
         if (metodo === 'DELETE' && !window.confirm(`Remover ${nome} deste subevento? A presença neste subevento também será removida. A inscrição no evento principal e certificados já emitidos serão mantidos.`)) return
         setProcessando(inscricaoId)
         try {
@@ -78,6 +81,25 @@ export default function InscritosSubeventoPage() {
             toast.error(error instanceof Error ? error.message : 'Erro de conexão')
             await carregar().catch(() => setErro('Não foi possível atualizar a lista. Tente carregar novamente.'))
         } finally { setProcessando(null) }
+    }
+
+    async function confirmarPresenca(item: Inscrito) {
+        if (ocupado || erro || !canCheckin || item.checkIn || item.inscricao.status !== 'CONFIRMADA') return
+        setConfirmandoPresenca(item.inscricaoId)
+        try {
+            const res = await apiFetch(`/api/admin/inscricoes/${item.inscricaoId}/checkin`, {
+                isAdmin: true,
+                method: 'POST',
+                body: JSON.stringify({ tipo: 'SUBEVENTO', subeventoId }),
+            })
+            const json = await res.json()
+            if (!res.ok) throw new Error(json.error?.message || 'Não foi possível confirmar o check-in')
+            toast.success('Presença confirmada no subevento')
+            await carregar().catch(() => setErro('Presença salva, mas não foi possível atualizar a lista. Tente carregar novamente.'))
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Erro de conexão')
+            await carregar().catch(() => setErro('Não foi possível atualizar a lista. Tente carregar novamente.'))
+        } finally { setConfirmandoPresenca(null) }
     }
 
     const inscritos = dados?.inscritos.filter(item => corresponde(item.inscricao.aluno, buscaInscritos)) ?? []
@@ -95,14 +117,14 @@ export default function InscritosSubeventoPage() {
                 <h1 className="text-2xl font-bold">Inscritos{dados ? `: ${dados.subevento.nome}` : ' no subevento'}</h1>
                 {dados && <p className="mt-1 text-sm text-slate-500" aria-live="polite">{dados.inscritos.length} de {dados.subevento.totalVagas} vagas ocupadas</p>}
             </div>
-            <Button disabled={readOnly || !dados || Boolean(processando) || Boolean(erro)} onClick={() => setMostrarAdicionar(!mostrarAdicionar)} aria-expanded={mostrarAdicionar} aria-controls="adicionar-aluno">
+            <Button disabled={readOnly || !dados || ocupado || Boolean(erro)} onClick={() => setMostrarAdicionar(!mostrarAdicionar)} aria-expanded={mostrarAdicionar} aria-controls="adicionar-aluno">
                 <Plus size={18} className="mr-2" /> {mostrarAdicionar ? 'Fechar inclusão' : 'Adicionar aluno'}
             </Button>
         </div>
 
         {erro && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             {erro}
-            <Button variant="link" disabled={Boolean(processando)} onClick={() => carregar().catch(error => setErro(error instanceof Error ? error.message : 'Erro de conexão'))}>Tentar novamente</Button>
+            <Button variant="link" disabled={ocupado} onClick={() => carregar().catch(error => setErro(error instanceof Error ? error.message : 'Erro de conexão'))}>Tentar novamente</Button>
         </div>}
         {loading && <p role="status" className="flex items-center justify-center gap-2 p-12 text-slate-500"><Loader2 className="animate-spin" size={20} /> Carregando inscritos...</p>}
 
@@ -125,7 +147,7 @@ export default function InscritosSubeventoPage() {
                                     <p className="text-xs text-slate-500 break-words">{candidato.aluno.id}{candidato.aluno.email ? ` · ${candidato.aluno.email}` : ''}</p>
                                     {limiteAtingido && <p className="text-xs text-amber-800">Limite de subeventos atingido</p>}
                                 </div>
-                                <Button size="sm" variant="outline" disabled={readOnly || lotado || limiteAtingido || Boolean(processando) || Boolean(erro)} aria-label={`Adicionar ${candidato.aluno.nome} ao subevento`} onClick={() => alterar(candidato.id, candidato.aluno.nome, 'POST')}>
+                                <Button size="sm" variant="outline" disabled={readOnly || lotado || limiteAtingido || ocupado || Boolean(erro)} aria-label={`Adicionar ${candidato.aluno.nome} ao subevento`} onClick={() => alterar(candidato.id, candidato.aluno.nome, 'POST')}>
                                     {processando === candidato.id ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Plus size={14} className="mr-2" />} Adicionar
                                 </Button>
                             </li>
@@ -154,8 +176,14 @@ export default function InscritosSubeventoPage() {
                                 {inscritos.map(item => <tr key={item.id}>
                                     <td className="p-3"><p className="font-semibold">{item.inscricao.aluno.nome}</p><p className="text-xs text-slate-500">{item.inscricao.aluno.id}</p>{item.inscricao.aluno.email && <p className="text-xs text-slate-500 break-all">{item.inscricao.aluno.email}</p>}</td>
                                     <td className="p-3"><p className="whitespace-nowrap">{formatDate(item.dataInscricao, 'dd/MM/yyyy HH:mm')}</p>{item.inscricao.status !== 'CONFIRMADA' && <p className="text-xs text-amber-800">Evento: {item.inscricao.status}</p>}</td>
-                                    <td className="p-3"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${item.checkIn ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{item.checkIn ? 'Confirmada' : 'Não registrada'}</span></td>
-                                    <td className="p-3 text-right"><Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" disabled={!canRemove || Boolean(processando) || Boolean(erro)} aria-label={`Remover ${item.inscricao.aluno.nome} deste subevento`} onClick={() => alterar(item.inscricaoId, item.inscricao.aluno.nome, 'DELETE')}>
+                                    <td className="p-3"><div className="flex flex-col items-start gap-2">
+                                        <span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${item.checkIn ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{item.checkIn ? 'Confirmada' : 'Não registrada'}</span>
+                                        {!item.checkIn && canCheckin && <Button size="sm" variant="outline" disabled={ocupado || Boolean(erro) || item.inscricao.status !== 'CONFIRMADA'} aria-label={`Confirmar check-in de ${item.inscricao.aluno.nome} neste subevento`} onClick={() => confirmarPresenca(item)}>
+                                            {confirmandoPresenca === item.inscricaoId ? <Loader2 size={14} className="mr-2 animate-spin" /> : <CheckCircle size={14} className="mr-2" />}
+                                            {confirmandoPresenca === item.inscricaoId ? 'Confirmando...' : 'Confirmar check-in'}
+                                        </Button>}
+                                    </div></td>
+                                    <td className="p-3 text-right"><Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" disabled={!canRemove || ocupado || Boolean(erro)} aria-label={`Remover ${item.inscricao.aluno.nome} deste subevento`} onClick={() => alterar(item.inscricaoId, item.inscricao.aluno.nome, 'DELETE')}>
                                         {processando === item.inscricaoId ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Trash2 size={14} className="mr-2" />} Remover
                                     </Button></td>
                                 </tr>)}
