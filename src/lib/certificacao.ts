@@ -1,23 +1,41 @@
+interface EventoCargaHoraria {
+    cargaHorariaBase: number | null
+    limiteSubeventosPorAluno?: number | null
+}
+
+interface PresencaSubevento {
+    checkIn?: unknown
+    subevento?: { cargaHoraria: number } | null
+}
+
+export function calcularCargaHorariaSubeventos(evento: EventoCargaHoraria, subeventos: PresencaSubevento[] = []) {
+    const presencas = subeventos.filter(s => s.checkIn && s.subevento)
+    const limite = evento.limiteSubeventosPorAluno
+    if (limite != null && limite > 0 && presencas.length >= limite &&
+        evento.cargaHorariaBase != null && evento.cargaHorariaBase > 0) {
+        return evento.cargaHorariaBase
+    }
+    return presencas.reduce((total, item) => total + (item.subevento?.cargaHoraria || 0), 0)
+}
+
 interface InscricaoCertificavel {
     status: string
     checkIn?: unknown
-    evento: {
+    evento: EventoCargaHoraria & {
         status: string
         dataFim: Date | string
         temSubeventos: boolean
-        cargaHorariaBase: number | null
         certificado?: { ativo: boolean } | null
     }
-    subeventosEscolhidos?: { checkIn?: unknown; subevento?: { cargaHoraria: number } | null }[]
+    subeventosEscolhidos?: PresencaSubevento[]
 }
 
 export function avaliarCertificacao(inscricao: InscricaoCertificavel, agora = new Date()) {
     const { evento } = inscricao
     const presencasSub = evento.temSubeventos ? (inscricao.subeventosEscolhidos || []).filter(s => s.checkIn && s.subevento) : []
     const temPresenca = Boolean(inscricao.checkIn) || presencasSub.length > 0
-    // Preserva as horas das atividades cursadas; na presença geral, usa a carga base.
     const cargaHoraria = presencasSub.length
-        ? presencasSub.reduce((total, item) => total + (item.subevento?.cargaHoraria || 0), 0)
+        ? calcularCargaHorariaSubeventos(evento, presencasSub)
         : inscricao.checkIn ? evento.cargaHorariaBase || 0 : 0
     const eventoFinalizado = evento.status === 'FINISHED' || (evento.status === 'PUBLISHED' && new Date(evento.dataFim).getTime() <= agora.getTime())
     let motivo: string | null = null

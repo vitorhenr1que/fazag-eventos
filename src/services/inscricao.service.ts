@@ -4,7 +4,7 @@ import { EventoRepository } from '@/repositories/evento.repository'
 import { AppError } from '@/lib/app-error'
 import { comLockFinanceiro } from '@/lib/financeiro-lock'
 import { calcularPagamento, reconhecerReferencia, type AprovacaoFinanceira } from '@/lib/financeiro'
-import { avaliarCertificacao } from '@/lib/certificacao'
+import { avaliarCertificacao, calcularCargaHorariaSubeventos } from '@/lib/certificacao'
 
 const inscricaoRepo = new InscricaoRepository()
 const eventoRepo = new EventoRepository()
@@ -299,8 +299,7 @@ export class InscricaoService {
             if (!inscricao.evento.temSubeventos) {
                 cargaHoraria = inscricao.evento.cargaHorariaBase || 0
             } else {
-                const subeventosComPresenca = (inscricao.subeventosEscolhidos as any[]).filter((s: any) => s.checkIn)
-                cargaHoraria = subeventosComPresenca.reduce((acc: number, curr: any) => acc + curr.subevento.cargaHoraria, 0)
+                cargaHoraria = calcularCargaHorariaSubeventos(inscricao.evento, inscricao.subeventosEscolhidos)
             }
         }
 

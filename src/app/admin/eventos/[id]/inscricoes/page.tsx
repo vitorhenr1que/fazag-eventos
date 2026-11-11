@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiFetch } from '@/lib/api-client'
+import { calcularCargaHorariaSubeventos } from '@/lib/certificacao'
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft, CheckCircle, CreditCard, Check, FileText, Download, Trash2 } from 'lucide-react'
 import Link from 'next/link'
@@ -162,7 +163,7 @@ export default function InscricoesEventoPage() {
             if (!evento.temSubeventos) {
                 sugerido = evento.cargaHorariaBase || 0
             } else {
-                sugerido = insc.subeventosEscolhidos.filter((se: any) => se.checkIn).reduce((acc: number, curr: any) => acc + curr.subevento.cargaHoraria, 0)
+                sugerido = calcularCargaHorariaSubeventos(evento, insc.subeventosEscolhidos)
             }
         }
 

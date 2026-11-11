@@ -24,7 +24,8 @@ function environment(record = inscricao()) {
         exclusaoEvento: { findUnique: async () => null },
         aluno: { findUnique: async ({ where }) => ({ id: where.id }) },
         inscricao: { findUnique: async () => record, findMany: async () => [record] },
-        certificado: { findMany: async () => [], create: async ({ data }) => { created.push(data); return record.certificado = { id: 'cert-1', ...data } } },
+        certificado: { findMany: async () => [], findUnique: async () => record.certificado,
+            create: async ({ data }) => { created.push(data); return record.certificado = { id: 'cert-1', ...data } } },
     }
     const cache = new Map()
     function load(file) {
@@ -71,6 +72,45 @@ test('presença nas atividades mantém as horas efetivamente cursadas sem duplic
     const res = await env.emitir()
     assert.equal(res.status, 200)
     assert.equal((await res.json()).data.cargaHorariaTotal, 7)
+})
+
+test('carga base depende do limite de check-ins e vale para emissão do aluno e do administrador', async () => {
+    for (const caso of [
+        { limite: 2, base: 20, presencas: 2, horas: 20 },
+        { limite: 2, base: 20, presencas: 1, horas: 3 },
+        { limite: 2, base: null, presencas: 2, horas: 6 },
+        { limite: 2, base: 0, presencas: 2, horas: 6 },
+        { limite: null, base: 20, presencas: 2, horas: 6 },
+        { limite: 0, base: 20, presencas: 2, horas: 6 },
+        { limite: 1, base: 20, presencas: 2, horas: 20 },
+        { limite: 2, base: 4, presencas: 2, horas: 4 },
+    ]) {
+        for (const admin of [false, true]) {
+            const env = environment()
+            env.record.checkIn = null
+            env.record.evento.limiteSubeventosPorAluno = caso.limite
+            env.record.evento.cargaHorariaBase = caso.base
+            env.record.subeventosEscolhidos = [0, 1].map(i => ({
+                checkIn: i < caso.presencas ? { id: `s${i}` } : null,
+                subevento: { nome: `Atividade ${i}`, cargaHoraria: 3 },
+            }))
+            assert.equal(avaliarCertificacao(env.record).cargaHoraria, caso.horas)
+            const certificado = admin
+                ? await new (env.load('services/inscricao.service.ts').InscricaoService)().adminEmitirCertificado(env.record.id)
+                : (await (await env.emitir()).json()).data
+            assert.equal(certificado.cargaHorariaTotal, caso.horas, JSON.stringify({ ...caso, admin }))
+            assert.equal(certificado.metadadosEvento.cargaHoraria, caso.horas)
+        }
+    }
+})
+
+test('administrador mantém a opção de informar uma carga horária personalizada', async () => {
+    const env = environment()
+    env.record.evento.limiteSubeventosPorAluno = 1
+    env.record.evento.cargaHorariaBase = 20
+    env.record.subeventosEscolhidos = [{ checkIn: { id: 's1' }, subevento: { nome: 'Atividade', cargaHoraria: 3 } }]
+    const service = new (env.load('services/inscricao.service.ts').InscricaoService)()
+    assert.equal((await service.adminEmitirCertificado(env.record.id, 12)).cargaHorariaTotal, 12)
 })
 
 test('recusa emissão sem presença, sem liberação, com inscrição pendente ou carga não configurada', async () => {
